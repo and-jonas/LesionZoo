@@ -379,6 +379,74 @@ def spline_contours(mask_obj, mask_all, img, checker):
     return final_profiles, (checker, checker_filtered), (spl_n, spl_n_full, spl_n_red_l, spl_n_red), spline_points
 
 
+def get_color_profiles(profile, scale, smooth, remove_missing):
+
+    # get all channels of all color spaces
+    _, descriptors, descriptor_names = get_color_spaces(profile)
+    descs = cv2.split(descriptors)
+
+    # get a scaled profile for each channel of each color space
+    if scale:
+        descriptors_sc = []
+        for desc, desc_name in zip(descs, descriptor_names):
+            # get the 2- and 98-percentile
+            perc_2 = np.percentile(desc, q=2)
+            perc_98 = np.percentile(desc, q=98)
+            # replace values higher or lower than the percentiles by the percentile value
+            # this should be more robust than to scale to the full observed range
+            desc = np.where(desc > perc_98, perc_98, desc)
+            desc = np.where(desc < perc_2, perc_2, desc)
+            # scale to 0...1, with percentiles as max and min values
+            desc_sc = (desc - perc_2) / (perc_98 - perc_2)
+            descriptors_sc.append(desc_sc)
+        DESC = descriptors_sc
+    else:
+        DESC = descs
+
+    # smooth profile using moving average for each channel of each color space
+    if smooth:
+        desc_sm = []
+        for desc in DESC:
+            t = np.ones(smooth)/smooth
+            kernel = t.reshape(smooth, 1)
+            # convolve 2d the kernel with each channel
+            smoothed = signal.convolve2d(desc, kernel, mode='same')
+            desc_sm.append(smoothed)
+        DESC = desc_sm
+
+    # replace missing pixels (now white) by np.NaN
+    desc_rm = []
+    if remove_missing:
+        mask = profile == 255
+        all_white = mask.sum(axis=2) == 3
+        idx_na = np.where(all_white)
+        for desc in DESC:
+            desc[idx_na] = np.NaN
+            desc_rm.append(desc)
+        DESC = desc_rm
+
+    # flatten
+    matrix = np.vstack(DESC)
+    matrix_ = matrix.transpose()
+    df = pd.DataFrame(matrix_)
+
+    # get the profile depths (variable due to size differences of lesions)
+    profile_depth = len(DESC[0])
+    pixel_in = 35
+    pixel_out = 41
+
+    # add column names
+    name_channel = list(chain.from_iterable(zip(*repeat(descriptor_names, profile_depth))))
+    name_pixel_position = [i for i in range(-pixel_in, pixel_out, 1)] * 21
+    colnames = ["{}_{}".format(a, b) for a, b in zip(name_channel, name_pixel_position)]
+    df.columns = colnames
+
+    if smooth:
+        df = df[df.columns.drop(list(df.filter(regex='-35|-34|-33|38|39|40')))]
+
+    return df
+
+
 def extract_color_profiles(profile, task, scale, smooth=10):
     """
     Performs color transformation and scales values of each channel in each color space

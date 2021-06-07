@@ -98,6 +98,37 @@ def filter_objects_size(mask, size_th, dir):
 
     return cleaned
 
+
+def filter_object_elongation(mask, threshold):
+
+    out_mask = np.zeros(mask.shape).astype("uint8")
+
+    # get contours
+    _, contours, hier = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    for c in contours:
+        # measures of object elongation
+        rect = cv2.minAreaRect(c)
+        bbox = np.int0(cv2.boxPoints(rect))
+        (tl, tr, br, bl) = bbox
+        xdist1 = tl[0] - tr[0]
+        ydist1 = tl[1] - tr[1]
+        length1 = math.sqrt(xdist1 * xdist1 + ydist1 * ydist1)
+        xdist2 = tl[0] - bl[0]
+        ydist2 = tl[1] - bl[1]
+        length2 = math.sqrt(xdist2 * xdist2 + ydist2 * ydist2)
+        long = max(length1, length2)
+        short = min(length1, length2)
+        elong = short / long
+
+        if elong < threshold:
+            cv2.drawContours(out_mask, [c], 0, 255, -1)
+
+    return out_mask
+
+
+
+
 # ======================================================================================================================
 
 

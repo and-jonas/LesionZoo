@@ -127,6 +127,10 @@ class ImageSegmentor:
         img = img[:, :, :3]
         img = np.ascontiguousarray(img, dtype=np.uint8)
 
+        # ==============================================================================================================
+        # extract leaf
+        # ==============================================================================================================
+
         # detect leaf (remove white background)
         lower_white = np.array([250, 250, 250], dtype=np.uint8)
         upper_white = np.array([255, 255, 255], dtype=np.uint8)
@@ -137,10 +141,46 @@ class ImageSegmentor:
         kernel = np.ones((15, 15), np.uint8)
         mask1_erode = morphology.erosion(mask_leaf, kernel)
         # "shrink" leaf
-        mask = mask * mask1_erode
+        mask_leaf = mask * mask1_erode
+
+        # ==============================================================================================================
+        # Try to remove central leaf vein and insect damage (grey lesions)
+        # ==============================================================================================================
+
+        # threshold values
+        lower_grey = np.array([145, 145, 135], dtype=np.uint8)
+        upper_grey = np.array([255, 255, 255], dtype=np.uint8)
+        # get gray areas
+        mask_leaf_cl = cv2.inRange(img, lower_grey, upper_grey)
+        # dilate in y-direction
+        # this should connect separated segments along leaf vein
+        kernel = np.ones((3, 19), np.uint8)
+        mask_leaf_cl_dil = morphology.dilation(mask_leaf_cl, kernel)
+
+        # erode leaf mask to keep the leaf edges intact
+        kernel = np.ones((35, 35), np.uint8)
+        mask2_erode = morphology.erosion(mask1_erode, kernel)
+        # "shrink" leaf
+        mask_leaf_cl_dil = mask_leaf_cl_dil * mask2_erode
+
+        # keep only strongly elongated objects of certain size
+        mask_leaf_cl_dil_filter = utils.filter_objects_size(mask_leaf_cl_dil, 500, "smaller")
+        mask_leaf_cl_dil_filter2 = utils.filter_object_elongation(mask_leaf_cl_dil_filter, threshold=0.15)
+
+        # dilate kept objects to remove them from mask
+        kernel = np.ones((13, 13), np.uint8)
+        mask_leaf_cl_dil_filter2 = morphology.dilation(mask_leaf_cl_dil_filter2, kernel)
+        # remove from mask
+        idx = np.where(mask_leaf_cl_dil_filter2 == 255)
+        mask_leaf_pp = copy.copy(mask_leaf)
+        mask_leaf_pp[idx] = 0
+
+        # ==============================================================================================================
+        # Morphological post-processing
+        # ==============================================================================================================
 
         # median filter to remove noise without affecting edges
-        mask_blur = cv2.medianBlur(mask, 17)
+        mask_blur = cv2.medianBlur(mask_leaf_pp, 17)
 
         # remove holes in lesions
         mask_pp = copy.copy(mask_blur)
@@ -149,18 +189,22 @@ class ImageSegmentor:
             cv2.drawContours(mask_pp, [cnt], 0, 255, -1)
 
         # remove holes in green leaf tissue (or small lesions)
-        mask_pp = utils.filter_objects_size(mask_pp, 1500, "smaller")
+        mask_pp = utils.filter_objects_size(mask_pp, 2000, "smaller")
 
         # slight opening
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
         mask_blur = cv2.morphologyEx(mask_pp, cv2.MORPH_CLOSE, kernel)
         # filter again by size
-        mask_blur = utils.filter_objects_size(mask_blur, 1500, "smaller")
+        mask_blur = utils.filter_objects_size(mask_blur, 2000, "smaller")
         # remove holes in lesions AGAIN
         mask_pp = copy.copy(mask_blur)
         _, contour, _ = cv2.findContours(mask_blur, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
         for cnt in contour:
             cv2.drawContours(mask_pp, [cnt], 0, 255, -1)
+
+        # ==============================================================================================================
+        # Smooth lesion edges and generate output
+        # ==============================================================================================================
 
         # approximate contour through a B-spline to obtain smooth lesion edges
         test_img = copy.copy(img)
@@ -184,6 +228,7 @@ class ImageSegmentor:
             cv2.drawContours(img_out_all_obj, [cnt], -1, (0, 0, 255), 3)
 
         mask_spl = utils.add_image_border(mask_spl, intensity=0)
+
         return img_out_all_obj, mask_spl
 
     def iterate_images(self, img_type):
@@ -192,7 +237,7 @@ class ImageSegmentor:
 
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn108_15_leaf_1.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn115_14_leaf_1.png"]
-        # files = ["D:/EschikonData/c3_collection/Exports/203_1_picture_2_leaf.png"]
+        files = ["D:/EschikonData/c3_collection/Exports/113_2_picture_8_leaf.png"]
 
         for i, file in enumerate(files):
 
@@ -217,31 +262,31 @@ class ImageSegmentor:
             # IMAGE SEGMENTATION
             # ==========================================================================================================
 
-            # if output already exists, load from disk
-            if Path(mask_all_name_out).exists():
-                print("Skipping Segmentation")
-                # if the purpose is to predict new images
-                # load mask containing ALL objects of interest !
-                if img_type == "prediction":
-                    mask_all_obj = imageio.imread(mask_all_name_out)
-                # if the purpose is to "re-predict" the training data
-                # load mask containing ONLY the object of interest !
-                elif img_type == "training":
-                    mask_all_obj = imageio.imread(mask_name_out)
-
-            # if not, process images
-            else:
-                print(f'processing {i+1}/{len(files)}')
-                # predict pixel labels
-                mask = self.segment_image(img)
-                # post process mask
-                img_out_all_obj, mask_all_obj = self.post_process_segmentation_mask(
-                    img,
-                    mask,
-                )
-                # save mask
-                Path(os.path.dirname(mask_all_name_out)).mkdir(parents=True, exist_ok=True)
-                imageio.imwrite(mask_all_name_out, mask_all_obj)
+            # # if output already exists, load from disk
+            # if Path(mask_all_name_out).exists():
+            #     print("Skipping Segmentation")
+            #     # if the purpose is to predict new images
+            #     # load mask containing ALL objects of interest !
+            #     if img_type == "prediction":
+            #         mask_all_obj = imageio.imread(mask_all_name_out)
+            #     # if the purpose is to "re-predict" the training data
+            #     # load mask containing ONLY the object of interest !
+            #     elif img_type == "training":
+            #         mask_all_obj = imageio.imread(mask_name_out)
+            #
+            # # if not, process images
+            # else:
+            print(f'processing {i+1}/{len(files)}')
+            # predict pixel labels
+            mask = self.segment_image(img)
+            # post process mask
+            img_out_all_obj, mask_all_obj = self.post_process_segmentation_mask(
+                img,
+                mask,
+            )
+            # save mask
+            Path(os.path.dirname(mask_all_name_out)).mkdir(parents=True, exist_ok=True)
+            imageio.imwrite(mask_all_name_out, mask_all_obj)
 
             img = utils.add_image_border(img, intensity=255)
             check_img = copy.copy(img)

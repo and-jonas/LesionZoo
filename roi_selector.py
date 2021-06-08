@@ -143,7 +143,7 @@ class TrainingPatchSelector:
 
         # handle closing of GUI without action
         if not rois:
-            pass
+            os.remove(file)
 
         else:
             # iterate over all rois

@@ -204,12 +204,13 @@ class ImageSegmentor:
             contour_img = np.delete(prof, cols_drop, axis=1)
             plt.imshow(contour_img)
 
-            df = fef.reshape_for_clustering(contour_img)
+            df = fef.extract_color_profiles(contour_img, task=0, scale=True)
+            # df = fef.get_color_spaces(contour_img)  # OLD
 
             img_check = checker[1]
 
             # save data
-            prof_name = f'{dirname}/Scans/Profiles/spl_n/{trcname}.csv'
+            prof_name = f'{dirname}/Scans/Profiles/spl_n/{trcname}_iter1.csv'
             Path(os.path.dirname(prof_name)).mkdir(parents=True, exist_ok=True)
             df.to_csv(prof_name, index=False)
 

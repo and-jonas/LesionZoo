@@ -475,14 +475,6 @@ def extract_color_profiles(profile, task, scale, smooth=10):
             desc_sm.append(smoothed)
         descs = desc_sm
 
-    # fig, axs = plt.subplots(1, 2, sharex=True, sharey=True)
-    # # Show RGB and segmentation mask
-    # axs[0].imshow(descs[0])
-    # axs[0].set_title('original patch')
-    # axs[1].imshow(desc_sm[0])
-    # axs[1].set_title('original patch')
-    # plt.show(block=True)
-
     # get a scaled profile for each channel of each color space
     if scale:
         descriptors_sc = []
@@ -548,11 +540,12 @@ def cluster_complete_profiles(data):
             K = range(1, max_n_clust+1)
         elif max_n_clust <= 30:
             K = chain(range(1, 11), range(12, 20, 2))
+        elif max_n_clust <= 50:
+            K = chain(range(1, 11), range(12, 21, 2), range(25, 51, 5))
         else:
-            K = chain(range(1, 11), range(12, 20, 2), range(25, max_n_clust+1, 5))
+            K = chain(range(1, 11), range(12, 21, 2), range(25, 51, 5), range(50, max_n_clust+1, 10))
         KM = [kmeans(data, k) for k in K]
         centroids = [cent for (cent, var) in KM]
-        print(f'----making {len(centroids)} clusters')  # get cluster centroids
 
         # get average within-cluster sum of squares (residual variation)
         D_k = [cdist(data, cent, 'euclidean') for cent in centroids]
@@ -564,6 +557,8 @@ def cluster_complete_profiles(data):
             best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 1.0)
         else:
             best_n_clust = max_n_clust
+
+        print(f'----making {best_n_clust} clusters')  # get cluster centroids
 
         # perform k-means clustering on profiles, into identified optimal number of clusters
         k_means = KMeans(n_clusters=best_n_clust, random_state=0).fit(data)

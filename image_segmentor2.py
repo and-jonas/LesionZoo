@@ -265,31 +265,31 @@ class ImageSegmentor:
             # IMAGE SEGMENTATION
             # ==========================================================================================================
 
-            # # if output already exists, load from disk
-            # if Path(mask_all_name_out).exists():
-            #     print("Skipping Segmentation")
-            #     # if the purpose is to predict new images
-            #     # load mask containing ALL objects of interest !
-            #     if img_type == "prediction":
-            #         mask_all_obj = imageio.imread(mask_all_name_out)
-            #     # if the purpose is to "re-predict" the training data
-            #     # load mask containing ONLY the object of interest !
-            #     elif img_type == "training":
-            #         mask_all_obj = imageio.imread(mask_name_out)
-            #
-            # # if not, process images
-            # else:
-            print(f'processing {i+1}/{len(files)}')
-            # predict pixel labels
-            mask = self.segment_image(img)
-            # post process mask
-            img_out_all_obj, mask_all_obj = self.post_process_segmentation_mask(
-                img,
-                mask,
-            )
-            # save mask
-            Path(os.path.dirname(mask_all_name_out)).mkdir(parents=True, exist_ok=True)
-            imageio.imwrite(mask_all_name_out, mask_all_obj)
+            # if output already exists, load from disk
+            if Path(mask_all_name_out).exists():
+                print("Skipping Segmentation")
+                # if the purpose is to predict new images
+                # load mask containing ALL objects of interest !
+                if img_type == "prediction":
+                    mask_all_obj = imageio.imread(mask_all_name_out)
+                # if the purpose is to "re-predict" the training data
+                # load mask containing ONLY the object of interest !
+                elif img_type == "training":
+                    mask_all_obj = imageio.imread(mask_name_out)
+
+            # if not, process images
+            else:
+                print(f'processing {i+1}/{len(files)}')
+                # predict pixel labels
+                mask = self.segment_image(img)
+                # post process mask
+                img_out_all_obj, mask_all_obj = self.post_process_segmentation_mask(
+                    img,
+                    mask,
+                )
+                # save mask
+                Path(os.path.dirname(mask_all_name_out)).mkdir(parents=True, exist_ok=True)
+                imageio.imwrite(mask_all_name_out, mask_all_obj)
 
             img = utils.add_image_border(img, intensity=255)
             check_img = copy.copy(img)
@@ -346,7 +346,8 @@ class ImageSegmentor:
 
                 # generate some colors
                 colors = []
-                for k in range(100):
+                n_clust = len(df['Cluster'].unique())
+                for k in range(n_clust):
                     colors.append(utils.random_color())
 
                 # draw all kept contour normals

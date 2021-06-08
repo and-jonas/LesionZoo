@@ -506,3 +506,46 @@ def extract_clustered_contour_color_profiles(contour_img, slice_by=5):
     return df, fig
 
 
+def reshape_for_clustering(profile):
+
+    # get all channels of all color spaces
+    _, descriptors, descriptor_names = get_color_spaces(profile)
+    descs = cv2.split(descriptors)
+
+    # get a scaled profile for each channel of each color space
+    descriptors_sc = []
+    for desc, desc_name in zip(descs, descriptor_names):
+        # get the 2- and 98-percentile
+        perc_2 = np.percentile(desc, q=2)
+        perc_98 = np.percentile(desc, q=98)
+        # replace values higher or lower than the percentiles by the percentile value
+        # this should be more robust than to scale to the full observed range
+        desc = np.where(desc > perc_98, perc_98, desc)
+        desc = np.where(desc < perc_2, perc_2, desc)
+        # scale to 0...1, with percentiles as max and min values
+        desc_sc = (desc - perc_2) / (perc_98 - perc_2)
+        # # mean over rows
+        # row_means = desc_sc.mean(axis=1)
+        # # running mean
+        # np.convolve(desc_sc, np.ones(3) / 3, mode='valid')
+        descriptors_sc.append(desc_sc)
+
+    # flatten
+    matrix = np.vstack(descriptors_sc)
+
+    # vstacked color spaces
+    matrix_ = matrix.transpose()
+    df = pd.DataFrame(matrix_)
+
+    # get the profile depths (variable due to size differences of lesions)
+    profile_depth = len(descriptors_sc[0])
+    pixel_in = 35
+    pixel_out = 41
+
+    # add column names
+    name_channel = list(chain.from_iterable(zip(*repeat(descriptor_names, profile_depth))))
+    name_pixel_position = [i for i in range(-pixel_in, pixel_out, 1)] * 21
+    colnames = ["{}_{}".format(a, b) for a, b in zip(name_channel, name_pixel_position)]
+    df.columns = colnames
+
+    return df

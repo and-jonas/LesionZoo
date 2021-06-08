@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import utils_tr as utils_r
 import utils as utils
 from scipy import ndimage as ndi
+from scipy import signal
 
 
 def get_color_spaces(patch):
@@ -354,7 +355,6 @@ def spline_contours(mask_obj, mask_all, img, checker):
         dist_profiles,
         dist_profiles_outer,
         spl_n,
-        check_img,
         remove=False
     )
 
@@ -396,34 +396,55 @@ def spline_contours(mask_obj, mask_all, img, checker):
     return final_profiles, (checker, checker_filtered), (spl_n, spl_n_full, spl_n_red_l, spl_n_red), spline_points
 
 
-def reshape_for_clustering(profile):
-
+def extract_color_profiles(profile, task, scale, smooth=10):
+    """
+    Performs color transformation and scales values of each channel in each color space
+    :param profile: An RGB image with stacked color profiles
+    :param task: If "clustering", only RGB is used and extracted profiles are smoothed, as specified.
+    :param scale: Boolean, if True the pixel values in each channel in each color space are scaled to range from 0 to 1.
+    Do not use if task is "clustering".
+    :param smooth: A numeric, indicating the window length for calculation of the moving average.
+    :return: A data frame where each row corresponds to one sampled spline normal
+    """
     # get all channels of all color spaces
     _, descriptors, descriptor_names = get_color_spaces(profile)
     descs = cv2.split(descriptors)
 
+    # use only RGB for clustering to reduce computational time
+    if task == "clustering":
+        descs = descs[:3]
+        descriptor_names = descriptor_names[:3]
+        # smooth along the y-axis, using moving average
+        desc_sm = []
+        for desc in descs:
+            t = np.ones(smooth)/smooth
+            kernel = t.reshape(smooth, 1)
+            # 2d-convolve each channel
+            smoothed = signal.convolve2d(desc, kernel, mode='same')
+            desc_sm.append(smoothed)
+        descs = desc_sm
+
     # get a scaled profile for each channel of each color space
-    descriptors_sc = []
-    for desc, desc_name in zip(descs, descriptor_names):
-        # get the 2- and 98-percentile
-        perc_2 = np.percentile(desc, q=2)
-        perc_98 = np.percentile(desc, q=98)
-        # replace values higher or lower than the percentiles by the percentile value
-        # this should be more robust than to scale to the full observed range
-        desc = np.where(desc > perc_98, perc_98, desc)
-        desc = np.where(desc < perc_2, perc_2, desc)
-        # scale to 0...1, with percentiles as max and min values
-        desc_sc = (desc - perc_2) / (perc_98 - perc_2)
-        # # mean over rows
-        # row_means = desc_sc.mean(axis=1)
-        # # running mean
-        # np.convolve(desc_sc, np.ones(3) / 3, mode='valid')
-        descriptors_sc.append(desc_sc)
+    if scale:
+        descriptors_sc = []
+        for desc, desc_name in zip(descs, descriptor_names):
+            # get the 2- and 98-percentile
+            perc_2 = np.percentile(desc, q=2)
+            perc_98 = np.percentile(desc, q=98)
+            # replace values higher or lower than the percentiles by the percentile value
+            # this should be more robust than to scale to the full observed range
+            desc = np.where(desc > perc_98, perc_98, desc)
+            desc = np.where(desc < perc_2, perc_2, desc)
+            # scale to 0...1, with percentiles as max and min values
+            desc_sc = (desc - perc_2) / (perc_98 - perc_2)
+            descriptors_sc.append(desc_sc)
+    else:
+        descriptors_sc = descs
 
     # flatten
     matrix = np.vstack(descriptors_sc)
 
-    # vstacked color spaces
+    # stack color spaces
     matrix_ = matrix.transpose()
     df = pd.DataFrame(matrix_)
 
@@ -434,7 +455,7 @@ def reshape_for_clustering(profile):
 
     # add column names
     name_channel = list(chain.from_iterable(zip(*repeat(descriptor_names, profile_depth))))
-    name_pixel_position = [i for i in range(-pixel_in, pixel_out, 1)] * 21
+    name_pixel_position = [i for i in range(-pixel_in, pixel_out, 1)] * len(descs)
     colnames = ["{}_{}".format(a, b) for a, b in zip(name_channel, name_pixel_position)]
     df.columns = colnames
 

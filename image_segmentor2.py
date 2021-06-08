@@ -29,6 +29,9 @@ import rpy2.robjects.packages as rpackages
 from rpy2.robjects.vectors import StrVector
 from rpy2.robjects.packages import importr
 
+# # IF WORKING ON REMOTE
+# os.environ['R_HOME'] = 'C:/Users/anjonas/Documents/R/R-3.6.2'
+
 numpy2ri.activate()
 pandas2ri.activate()
 
@@ -233,11 +236,11 @@ class ImageSegmentor:
 
     def iterate_images(self, img_type):
 
-        files = self.file_feed()[15:]
+        files = self.file_feed()[18:]
 
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn108_15_leaf_1.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn115_14_leaf_1.png"]
-        files = ["D:/EschikonData/c3_collection/Exports/113_2_picture_8_leaf.png"]
+        # files = ["D:/EschikonData/c3_collection/Exports/113_2_picture_8_leaf.png"]
 
         for i, file in enumerate(files):
 
@@ -304,8 +307,8 @@ class ImageSegmentor:
             # image for cluster visualization
             ctrl_cluster = copy.copy(img)
 
-            # # TEMPORARY
-            # rect = rect[31:]
+            # TEMPORARY
+            rect = rect[3:]
 
             # loop over all contours to process
             for i in range(len(rect)):
@@ -336,7 +339,7 @@ class ImageSegmentor:
                 #     fig.figure.savefig(cluster_name, dpi=2400)
                 plt.close()
 
-                # if there are no complete profiles, fef.cluster_profiles returns df = None
+                # if there are no complete profiles, fef.cluster_profiles() returns df = None
                 # these lesions are not analyzed
                 if df is None:
                     continue
@@ -400,8 +403,8 @@ class ImageSegmentor:
                 template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v2.csv")
                 cols = template.columns
 
-                # # TEMPORARY
-                # clusters = clusters[316:]
+                # TEMPORARY
+                clusters = clusters[176:]
 
                 # create prediction for each cluster
                 predicted_label = []
@@ -413,7 +416,6 @@ class ImageSegmentor:
 
                     print(f'-----cluster {i + 1}/{len(clusters)}')
 
-                    # INSERTED
                     df = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
                     # average profiles
                     df_mean = df.mean(axis=0, skipna=True)
@@ -421,17 +423,11 @@ class ImageSegmentor:
                     df_mean = df_mean.T
                     # df_mean.to_csv("Z:/Public/Jonas/001_LesionZoo/test.csv", index=False)
                     # get higher-level features
-                    params = r_getparams(dat=df_mean)
-
-                    # pandas2ri.activate()
-                    # pd_df = pandas2ri.ri2py(params)
-                    #
-                    # # conversion to pandas fails (probably pandas and rpy2 version incompatibility?!)
-                    # d = {'slp1': [params[0][0]], 'slp2': [params[1][0]], 'slprat': [params[2][0]], 'slpdiff': [params[3][0]],
-                    #      'c': [params[4][0]], 'c': [params[5][0]], 'd': [params[6][0]], 'e': [params[7][0]]}
-                    # df = pd.DataFrame(data=d)
-                    # params
-                    # END INSERTED
+                    try:
+                        params = r_getparams(dat=df_mean)
+                    except:
+                        print("Encountered problem while extracting model parameters!")
+                        continue
 
                     # get the color profiles and select the relevant columns (used to create a prediction)
                     # df = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
@@ -450,17 +446,9 @@ class ImageSegmentor:
                     # reorder columns
                     df_mean = df_mean_[cols]
 
-                    # robjects.reval('result <- as.character(prediction)')
-                    # # rename columns
-                    # string = "V"
-                    # names = [string + str(i) for i in range(1, 596)]
-                    # df_mean.columns = names
-
                     # make prediction
-                    # dataf = np.array(df_mean)
                     pred = robjects.r.predict(model, df_mean)
-                    # robjects.r.assign('prediction', pred)
-                    # robjects.reval('result <- as.character(prediction)')
+
                     try:
                         pred_lab = pred[0]
                     except IndexError:

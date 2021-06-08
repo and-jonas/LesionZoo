@@ -62,12 +62,12 @@ n_neg = train_data.groupby('response').count().iloc[1,0]
 n_min = min(n_pos, n_neg)
 train_data = train_data.groupby(['response']).apply(lambda grp: grp.sample(n=n_min))
 
-from sklearn.model_selection import RandomizedSearchCV # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 20, stop = 200, num = 10)]
+from sklearn.model_selection import RandomizedSearchCV  # Number of trees in random forest
+n_estimators = [int(x) for x in np.linspace(start=20, stop=200, num=10)]
 # Number of features to consider at every split
 max_features = ['auto', 'sqrt']
 # Maximum number of levels in tree
-max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth = [int(x) for x in np.linspace(10, 110, num=11)]
 max_depth.append(None)
 # Minimum number of samples required to split a node
 min_samples_split = [2, 5, 10]
@@ -88,11 +88,11 @@ random_grid = {'n_estimators': n_estimators,
 rf = RandomForestClassifier()
 # Random search of parameters, using 3 fold cross validation,
 # search across 100 different combinations, and use all available cores
-rf_random = RandomizedSearchCV(estimator = rf,
-                               param_distributions = random_grid,
-                               n_iter = 100, cv = 10,
+rf_random = RandomizedSearchCV(estimator=rf,
+                               param_distributions= random_grid,
+                               n_iter=100, cv=10,
                                verbose=3, random_state=42,
-                               n_jobs = -1)# Fit the random search model
+                               n_jobs=-1)  # Fit the random search model
 
 # predictor matrix
 X = np.asarray(train_data)[:, 0:21]

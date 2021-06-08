@@ -15,7 +15,7 @@ def run():
     dir_positives = "D:/LesionZoo/"
     dir_negatives = ""
     dir_model = "Z:/Public/Jonas/001_LesionZoo/Output/Models/rf_segmentation_v2.pkl"
-    file_index = [100, 120]
+    file_index = [0, 50]
     image_segmentor = ImageSegmentor(dir_positives=dir_positives,
                                      dir_negatives=dir_negatives,
                                      dir_model=dir_model,

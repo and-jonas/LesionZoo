@@ -567,11 +567,15 @@ d_mod <- data_mod_red %>%
   dplyr::select(-.id)
 
 template <- d_mod %>% dplyr::select(-label) %>% slice(1)
-write_csv(template, "Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v2.csv")
+write_csv(template, "Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v3.csv")
 
 # # test without model pars
 # d_mod <- data_mod_red %>% 
 #   dplyr::select(-.id)
+
+# ======================================================================================================== -
+
+# > pls ----
 
 # train and validate 
 indx <- createMultiFolds(d_mod$label, k = 10, times = 5)
@@ -615,8 +619,8 @@ close(file_conn)
 
 # > random forest ----
 #specify model tuning parameters
-mtry <- c(5, 9, 14, 20, 30, 45, 70, 100, 200)
-min_nodes <- c(2, 5, 10)
+mtry <- c(3, 5, 7, 9, 12, 15)
+min_nodes <- c(2, 3, 5, 8)
 tune_grid <- expand.grid(mtry = mtry,
                          splitrule = "gini", # default
                          min.node.size = min_nodes)
@@ -627,7 +631,7 @@ rf_ranger <- caret::train(label ~ .,
                           method = "ranger",
                           tuneGrid = tune_grid,
                           importance = "permutation",
-                          num.trees = 200,
+                          num.trees = 500,
                           trControl = ctrl)
 plot(rf_ranger)
 imp <- varImp(rf_ranger)

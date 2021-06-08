@@ -75,28 +75,27 @@ get_params <- function(dat){
     tidyr::nest(data = c(posY, mean)) %>%
     mutate(fit_bp_lm = purrr::map(data, breakpoint_lm)) %>%
     tidyr::unnest(fit_bp_lm)
+    
   bp_pars_v <- data_fits %>% dplyr::select(slp1:slpdiff)
-  names(bp_pars_v)[2:length(bp_pars_v)] <- paste0(names(bp_pars_v)[2:length(bp_pars_v)], "_v")
+  names(bp_pars_v) <- paste0(names(bp_pars_v), "_v")
   
   # ======================================================================================================================
  
    # Breakpoint model for R_RGB ----
   # select data
-  data_R <- all_means %>% 
+  data_R <- dat %>%
     filter(channel == "R", color_space == "RGB") %>% 
-    group_by(label, .id)
+    mutate(posY = posY + 32)
   
   ## fit breakpoint models
   data_fits <- data_R %>%
-    dplyr::select(.id, label, posY, mean) %>% 
-    as.data.frame() %>%
+    dplyr::select(posY, mean) %>%
     tidyr::nest(data = c(posY, mean)) %>%
-    group_by(.id) %>%
-    mutate(fit_bp_lm = purrr::map(data, breakpoint_lm)) %>% 
-    unnest(fit_bp_lm)
+    mutate(fit_bp_lm = purrr::map(data, breakpoint_lm)) %>%
+    tidyr::unnest(fit_bp_lm)
   
-  bp_pars_R <- data_fits %>% dplyr::select(.id, slp1:slpdiff)
-  names(bp_pars_R)[2:length(bp_pars_R)] <- paste0(names(bp_pars_R)[2:length(bp_pars_R)], "_R")
+  bp_pars_R <- data_fits %>% dplyr::select(slp1:slpdiff)
+  names(bp_pars_R) <- paste0(names(bp_pars_R), "_R")
   
   # ======================================================================================================================
   

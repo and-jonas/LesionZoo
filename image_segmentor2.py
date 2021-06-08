@@ -33,8 +33,8 @@ from rpy2.robjects.packages import importr
 numpy2ri.activate()
 pandas2ri.activate()
 
-model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v2.rds"
-model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v2.dep"
+model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v3.rds"
+model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v3.dep"
 
 # Load R model
 model = robjects.r.readRDS(model_rds_path)
@@ -67,7 +67,7 @@ segmented = importr('segmented')
 nls_multstart = importr('nls.multstart')
 
 r_source = robjects.r['source']
-r_source('Z:/Public/Jonas/001_LesionZoo/RCode/f_params.R')
+r_source('C:/Users/anjonas/PycharmProjects/LesionZoo/f_params.R')
 r_getparams = robjects.globalenv['get_params']
 
 # ======================================================================================================================
@@ -401,7 +401,7 @@ class ImageSegmentor:
 
                 # get ordering of columns
                 # template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames.csv")
-                template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v2.csv")
+                template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v3.csv")
                 cols = template.columns
 
                 # # TEMPORARY

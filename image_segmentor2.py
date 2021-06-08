@@ -16,11 +16,12 @@ import cv2
 from skimage import morphology
 from matplotlib import pyplot as plt
 import feature_extraction_functions as fef
-from importlib import reload
-reload(fef)
 import utils
 import pandas as pd
 import numpy as np
+
+# IF WORKING ON REMOTE    <===== !!!
+os.environ['R_HOME'] = 'C:/Users/anjonas/Documents/R/R-3.6.2'
 
 import rpy2.robjects as robjects
 from rpy2.robjects import numpy2ri
@@ -28,9 +29,6 @@ from rpy2.robjects import pandas2ri
 import rpy2.robjects.packages as rpackages
 from rpy2.robjects.vectors import StrVector
 from rpy2.robjects.packages import importr
-
-# # IF WORKING ON REMOTE
-# os.environ['R_HOME'] = 'C:/Users/anjonas/Documents/R/R-3.6.2'
 
 numpy2ri.activate()
 pandas2ri.activate()
@@ -50,7 +48,8 @@ rutils.chooseCRANmirror(ind=1)  # select the first mirror in the list
 # import R base package
 base = importr('base')
 
-base._libPaths("C:/Users/anjonas/Documents/R3Libs")
+# # IF WORKING LOCALLY    <===== !!!
+# base._libPaths("C:/Users/anjonas/Documents/R3Libs")
 print(base._libPaths())
 
 packnames = ('vctrs', 'caret', 'pls', 'segmented', 'nls.multstart', 'tidyverse')
@@ -76,11 +75,12 @@ r_getparams = robjects.globalenv['get_params']
 
 class ImageSegmentor:
 
-    def __init__(self, dir_positives, dir_negatives, dir_model, save_output):
+    def __init__(self, dir_positives, dir_negatives, dir_model, save_output, file_index):
         self.dir_positives = dir_positives
         self.dir_negatives = dir_negatives
         self.dir_model = dir_model
         self.save_output = save_output
+        self.file_index = file_index
 
     def file_feed(self):
 
@@ -236,7 +236,7 @@ class ImageSegmentor:
 
     def iterate_images(self, img_type):
 
-        files = self.file_feed()[18:]
+        files = self.file_feed()[self.file_index[0]:self.file_index[1]]
 
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn108_15_leaf_1.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn115_14_leaf_1.png"]
@@ -307,8 +307,8 @@ class ImageSegmentor:
             # image for cluster visualization
             ctrl_cluster = copy.copy(img)
 
-            # TEMPORARY
-            rect = rect[3:]
+            # # TEMPORARY
+            # rect = rect[3:]
 
             # loop over all contours to process
             for i in range(len(rect)):
@@ -403,8 +403,8 @@ class ImageSegmentor:
                 template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v2.csv")
                 cols = template.columns
 
-                # TEMPORARY
-                clusters = clusters[176:]
+                # # TEMPORARY
+                # clusters = clusters[176:]
 
                 # create prediction for each cluster
                 predicted_label = []

@@ -12,6 +12,7 @@ import glob
 import os
 from pathlib import Path
 import numpy as np
+import pandas as pd
 import imageio
 import cv2
 from skimage import morphology
@@ -91,13 +92,13 @@ class ImageSegmentor:
         for cnt in contour:
             cv2.drawContours(mask_pp, [cnt], 0, 255, -1)
 
-        # remove holes in green leaf tissue (component filtering - FASTER!)
+        # remove holes in green leaf tissue (component filtering)
         # detect all components on the original mask
         _, output, stats, _ = cv2.connectedComponentsWithStats(mask_pp, connectivity=8)
         sizes = stats[1:, -1];
         idx = (np.where(sizes >= 500)[0] + 1).tolist()
         out = np.in1d(output, idx).reshape(output.shape)
-        mask_pp = np.where(out == True, mask_pp, 0)
+        mask_pp = np.where(out, mask_pp, 0)
         mask_all_obj = mask_pp
 
         # filter out the main object (i.e. lesion of interest)
@@ -204,8 +205,9 @@ class ImageSegmentor:
             contour_img = np.delete(prof, cols_drop, axis=1)
             plt.imshow(contour_img)
 
-            df = fef.extract_color_profiles(contour_img, task=0, scale=True)
-            # df = fef.get_color_spaces(contour_img)  # OLD
+            df_sc = fef.extract_color_profiles(contour_img, task=0, scale=True)
+            df_raw = fef.extract_color_profiles(contour_img, task=0, scale=False)
+            df = pd.concat([df_sc, df_raw], axis=1, ignore_index=False)
 
             img_check = checker[1]
 

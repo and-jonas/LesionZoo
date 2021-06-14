@@ -108,14 +108,14 @@ class ImageSegmentor:
         descriptors_flatten = descriptors.reshape(-1, descriptors.shape[-1])
 
         # predict pixel label
-        a_segmented_flatten = model.predict(descriptors_flatten)
+        segmented_flatten = model.predict(descriptors_flatten)
 
         # restore image, return as binary mask
-        a_segmented = a_segmented_flatten.reshape((descriptors.shape[0], descriptors.shape[1]))
-        a_segmented = np.where(a_segmented == 'pos', 1, 0)
-        a_segmented = np.where(a_segmented == 0, 255, 0).astype("uint8")
+        segmented = segmented_flatten.reshape((descriptors.shape[0], descriptors.shape[1]))
+        segmented = np.where(segmented == 'pos', 1, 0)
+        segmented = np.where(segmented == 0, 255, 0).astype("uint8")
 
-        return a_segmented
+        return segmented
 
     def post_process_segmentation_mask(self, img, mask):
         """
@@ -168,6 +168,7 @@ class ImageSegmentor:
 
         # keep only strongly elongated objects of certain size
         mask_leaf_cl_dil_filter = utils.filter_objects_size(mask_leaf_cl_dil, 500, "smaller")
+        mask_leaf_cl_dil_filter = utils.filter_objects_size(mask_leaf_cl_dil_filter, 10000, "greater")
         mask_leaf_cl_dil_filter2 = utils.filter_object_elongation(mask_leaf_cl_dil_filter, threshold=0.15)
 
         # dilate kept objects to remove them from mask
@@ -231,8 +232,9 @@ class ImageSegmentor:
             cv2.drawContours(img_out_all_obj, [cnt], -1, (0, 0, 255), 3)
 
         mask_spl = utils.add_image_border(mask_spl, intensity=0)
+        mask_leaf_cl_dil_filter2 = utils.add_image_border(mask_leaf_cl_dil_filter2, intensity=0)
 
-        return img_out_all_obj, mask_spl
+        return img_out_all_obj, mask_spl, mask_leaf_cl_dil_filter2
 
     def iterate_images(self, img_type):
 
@@ -241,6 +243,7 @@ class ImageSegmentor:
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn108_15_leaf_1.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn115_14_leaf_1.png"]
         # files = ["D:/EschikonData/c3_collection/Exports/113_2_picture_8_leaf.png"]
+        files = ["D:/LesionZoo/321_1_picture_2_leaf.png"]
 
         for i, file in enumerate(files):
 
@@ -258,6 +261,7 @@ class ImageSegmentor:
             # output paths
             mask_name_out = f'{dirname}/Segmented/Mask/{basename}'
             mask_all_name_out = f'{dirname}/Segmented/Mask/allObj/{basename}'
+            mask_false_name_out = f'{dirname}/Segmented/Mask/false/{basename}'
             ctrl_output_name = f'{dirname}/Output/{basename}'
             ctrl_cluster_name = f'{dirname}/Segmented/Clusters_loc/{basename}'
 
@@ -269,9 +273,10 @@ class ImageSegmentor:
             if Path(mask_all_name_out).exists():
                 print("Skipping Segmentation")
                 # if the purpose is to predict new images
-                # load mask containing ALL objects of interest !
+                # load mask containing ALL objects of interest, and the false object mask
                 if img_type == "prediction":
                     mask_all_obj = imageio.imread(mask_all_name_out)
+                    mask_false = imageio.imread(mask_false_name_out)
                 # if the purpose is to "re-predict" the training data
                 # load mask containing ONLY the object of interest !
                 elif img_type == "training":
@@ -283,13 +288,15 @@ class ImageSegmentor:
                 # predict pixel labels
                 mask = self.segment_image(img)
                 # post process mask
-                img_out_all_obj, mask_all_obj = self.post_process_segmentation_mask(
+                img_out_all_obj, mask_all_obj, mask_false = self.post_process_segmentation_mask(
                     img,
                     mask,
                 )
-                # save mask
+                # save masks
                 Path(os.path.dirname(mask_all_name_out)).mkdir(parents=True, exist_ok=True)
                 imageio.imwrite(mask_all_name_out, mask_all_obj)
+                Path(os.path.dirname(mask_false_name_out)).mkdir(parents=True, exist_ok=True)
+                imageio.imwrite(mask_false_name_out, mask_false)
 
             img = utils.add_image_border(img, intensity=255)
             check_img = copy.copy(img)
@@ -307,7 +314,7 @@ class ImageSegmentor:
             # image for cluster visualization
             ctrl_cluster = copy.copy(img)
 
-            # # TEMPORARY
+            # # # TEMPORARY
             # rect = rect[3:]
 
             # loop over all contours to process
@@ -324,10 +331,11 @@ class ImageSegmentor:
                 checker = copy.copy(img)
                 prof, checker, spl, spl_points = fef.spline_contours(mask_obj=empty_mask,
                                                                      mask_all=empty_mask_all,
+                                                                     mask_false=mask_false,
                                                                      img=empty_img,
                                                                      checker=checker)
 
-                dists = utils.dist_to_centroid(spl_points, ctr, scale_factor=3)
+                dists = utils.dist_to_centroid(spl_points, ctr, scale_factor=5)
 
                 df, col_idx_kept, fig = fef.cluster_profiles(
                     profiles=prof,
@@ -417,7 +425,9 @@ class ImageSegmentor:
 
                     print(f'-----cluster {i + 1}/{len(clusters)}')
 
-                    df = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
+                    df_sc = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
+                    df_raw = fef.get_color_profiles(cluster, scale=False, smooth=7, remove_missing=True)
+                    df = pd.concat([df_sc, df_raw], axis=1, ignore_index=False)
                     # average profiles
                     df_mean = df.mean(axis=0, skipna=True)
                     df_mean = pd.DataFrame(df_mean)

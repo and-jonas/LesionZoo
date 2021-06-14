@@ -454,9 +454,14 @@ def extract_color_profiles(profile, task, scale, smooth=10):
     pixel_out = 41
 
     # add column names
+    if scale:
+        name_type = "_sc"
+    else:
+        name_type = "_raw"
     name_channel = list(chain.from_iterable(zip(*repeat(descriptor_names, profile_depth))))
     name_pixel_position = [i for i in range(-pixel_in, pixel_out, 1)] * len(descs)
     colnames = ["{}_{}".format(a, b) for a, b in zip(name_channel, name_pixel_position)]
+    colnames = [name + name_type for name in colnames]
     df.columns = colnames
 
     return df

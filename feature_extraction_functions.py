@@ -172,7 +172,8 @@ def extract_normals_pixel_values(img, normals):
     return scan
 
 
-def check_color_profiles(color_profiles, dist_profiles, dist_profiles_outer, spline_normals, remove=False):
+def check_color_profiles(color_profiles, dist_profiles, dist_profiles_outer, false_profiles, spline_normals,
+                         remove=False):
     """
     Removes spline normals (and corresponding color profiles) that (a) extend into the lesion sphere of the same lesion
     (convexity defects) and replaces values on the inner side of the spline normals that lie beyond the "center" of the
@@ -205,7 +206,7 @@ def check_color_profiles(color_profiles, dist_profiles, dist_profiles_outer, spl
             cut_idx = np.nan
         ind.append(cut_idx)
 
-    # for all pixels above the first break in monotoneous increase,
+    # for all pixels above the first break in monotonous increase,
     # replace pixel values with the average of the 4 preceding pixels on the same profile
     color_profiles_ = copy.copy(color_profiles)
     for i in range(color_profiles_.shape[1]):
@@ -217,9 +218,14 @@ def check_color_profiles(color_profiles, dist_profiles, dist_profiles_outer, spl
     dist_profiles_outer = dist_profiles_outer.astype("int32")[35:, ]
     diff_out = np.diff(dist_profiles_outer, axis=0)
 
+    false_profiles = false_profiles.astype("int32")[35:, ]
+
     if remove:
         # remove problematic spline normals
-        checker_out = np.unique(np.where(diff_out < 0)[1]).tolist()
+        checker_out_shape = np.unique(np.where(diff_out < 0)[1]).tolist()
+        checker_out_false = np.unique(np.where(false_profiles == 255)[1]).tolist()
+        checker_out = checker_out_shape + checker_out_false
+        checker_out = np.unique(checker_out)
         spline_normals_clean = [i for j, i in enumerate(spline_normals) if j not in checker_out]
         # remove corresponding color profiles
         color_profiles_ = np.delete(color_profiles_, checker_out, 1)
@@ -227,7 +233,9 @@ def check_color_profiles(color_profiles, dist_profiles, dist_profiles_outer, spl
 
     else:
         # separate the normals into complete and incomplete
-        cols = np.where(diff_out < 0)[1]
+        cols_shape = np.where(diff_out < 0)[1]
+        cols_false = np.where(false_profiles == 255)[1]
+        cols = np.append(cols_shape, cols_false)
         spline_normals_fulllength = [i for j, i in enumerate(spline_normals) if j not in np.unique(cols)]
         spline_normals_redlength = [i for j, i in enumerate(spline_normals) if j in np.unique(cols)]
 
@@ -237,6 +245,22 @@ def check_color_profiles(color_profiles, dist_profiles, dist_profiles_outer, spl
             result = np.where(diff_out[:, i] < 0)[0]
             if result.size > 0:
                 cut_idx = np.min(np.where(diff_out[:, i] < 0))
+            else:
+                cut_idx = np.nan
+            ind.append(cut_idx)
+
+        # for all pixels above this intersection
+        # replace pixels with white pixels
+        for i in range(color_profiles_.shape[1]):
+            if ind[i] is not np.nan:
+                color_profiles_[35+ind[i]:, i] = (255, 255, 255)
+
+        # identify where profiles extend into "false" lesions
+        ind = []
+        for i in range(false_profiles.shape[1]):
+            result = np.where(false_profiles[:, i] == 255)[0]
+            if result.size > 0:
+                cut_idx = np.min(np.where(false_profiles[:, i] == 255))
             else:
                 cut_idx = np.nan
             ind.append(cut_idx)
@@ -299,7 +323,7 @@ def remove_neighbor_lesions(checked_profiles, dist_profiles_multi, spl_n_clean, 
         return color_profiles_, spline_normals_fulllength, spline_normals_redlength
 
 
-def spline_contours(mask_obj, mask_all, img, checker):
+def spline_contours(mask_obj, mask_all, mask_false, img, checker):
     """
     Wrapper function for processing of contours via spline normals
     :param mask_obj: a binary mask containing only the lesion of interest.
@@ -328,8 +352,11 @@ def spline_contours(mask_obj, mask_all, img, checker):
     # get spline normals
     spl_n = utils.get_spline_normals(spline_points)
 
-    # sample the normals (on image and distance maps)
+    # # sample normals on image and on false object mask
+    false_profiles = extract_normals_pixel_values(mask_false, spl_n)
     color_profiles = extract_normals_pixel_values(img, spl_n)
+
+    # sample normals on distance maps
     dist_profiles = extract_normals_pixel_values(distance, spl_n)
     dist_profiles_outer = extract_normals_pixel_values(distance_invert, spl_n)
 
@@ -338,7 +365,8 @@ def spline_contours(mask_obj, mask_all, img, checker):
         color_profiles,
         dist_profiles,
         dist_profiles_outer,
-        spl_n,
+        false_profiles=false_profiles,
+        spline_normals=spl_n,
         remove=False
     )
 
@@ -436,9 +464,14 @@ def get_color_profiles(profile, scale, smooth, remove_missing):
     pixel_out = 41
 
     # add column names
+    if scale:
+        name_type = "_sc"
+    else:
+        name_type = "_raw"
     name_channel = list(chain.from_iterable(zip(*repeat(descriptor_names, profile_depth))))
     name_pixel_position = [i for i in range(-pixel_in, pixel_out, 1)] * 21
     colnames = ["{}_{}".format(a, b) for a, b in zip(name_channel, name_pixel_position)]
+    colnames = [name + name_type for name in colnames]
     df.columns = colnames
 
     if smooth:

@@ -56,10 +56,12 @@ get_params <- function(dat){
   DATA$posY <-  strsplit(names(dat),"_") %>% lapply("[[", 3) %>% unlist() %>% 
     # conversion to r_df transforms "-" in name to "." --> re-transform
     gsub("\\.", "-", .) %>% as.numeric()
+  DATA$type <- strsplit(names(dat),"_") %>% lapply("[[", 4) %>% unlist()
   # column names are not identical when transforming to r_df --> adjust
   DATA <- DATA %>% mutate(mean = V1)
   #select required columns
-  dat <- DATA %>% dplyr::select(channel, color_space, posY, mean)
+  dat <- DATA %>% dplyr::select(channel, color_space, type, posY, mean) %>% 
+    filter(type == "sc")
 
   # ======================================================================================================================
   

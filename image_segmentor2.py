@@ -33,8 +33,8 @@ from rpy2.robjects.packages import importr
 numpy2ri.activate()
 pandas2ri.activate()
 
-model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v3.rds"
-model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v3.dep"
+model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.rds"
+model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.dep"
 
 # Load R model
 model = robjects.r.readRDS(model_rds_path)
@@ -243,7 +243,7 @@ class ImageSegmentor:
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn108_15_leaf_1.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn115_14_leaf_1.png"]
         # files = ["D:/EschikonData/c3_collection/Exports/113_2_picture_8_leaf.png"]
-        files = ["D:/LesionZoo/321_1_picture_2_leaf.png"]
+        # files = ["D:/LesionZoo/321_1_picture_2_leaf.png"]
 
         for i, file in enumerate(files):
 
@@ -262,7 +262,7 @@ class ImageSegmentor:
             mask_name_out = f'{dirname}/Segmented/Mask/{basename}'
             mask_all_name_out = f'{dirname}/Segmented/Mask/allObj/{basename}'
             mask_false_name_out = f'{dirname}/Segmented/Mask/false/{basename}'
-            ctrl_output_name = f'{dirname}/Output/{basename}'
+            ctrl_output_name = f'{dirname}/Output/V2/{basename}'
             ctrl_cluster_name = f'{dirname}/Segmented/Clusters_loc/{basename}'
 
             # ==========================================================================================================
@@ -270,7 +270,7 @@ class ImageSegmentor:
             # ==========================================================================================================
 
             # if output already exists, load from disk
-            if Path(mask_all_name_out).exists():
+            if Path(mask_all_name_out).exists() and Path(mask_false_name_out).exists():
                 print("Skipping Segmentation")
                 # if the purpose is to predict new images
                 # load mask containing ALL objects of interest, and the false object mask
@@ -409,7 +409,7 @@ class ImageSegmentor:
 
                 # get ordering of columns
                 # template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames.csv")
-                template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v3.csv")
+                template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")
                 cols = template.columns
 
                 # # TEMPORARY
@@ -425,6 +425,7 @@ class ImageSegmentor:
 
                     print(f'-----cluster {i + 1}/{len(clusters)}')
 
+                    # extract scaled and raw color profiles
                     df_sc = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
                     df_raw = fef.get_color_profiles(cluster, scale=False, smooth=7, remove_missing=True)
                     df = pd.concat([df_sc, df_raw], axis=1, ignore_index=False)
@@ -440,16 +441,16 @@ class ImageSegmentor:
                         print("Encountered problem while extracting model parameters!")
                         continue
 
-                    # get the color profiles and select the relevant columns (used to create a prediction)
-                    # df = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
-                    df_ = df.iloc[:, 1:]
-                    df_ = df_.iloc[:, ::2]
-                    df_ = df_[df_.columns.drop(list(df_.filter(regex='L_Lab|YCC')))]
+                    # # get the color profiles and select the relevant columns (used to create a prediction)
+                    # # df = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
+                    # df_ = df.iloc[:, 1:]
+                    # df_ = df_.iloc[:, ::2]
+                    # df_ = df_[df_.columns.drop(list(df_.filter(regex='L_Lab|YCC')))]
 
-                    # average profiles
-                    df_mean = df_.mean(axis=0, skipna=True)
-                    df_mean = pd.DataFrame(df_mean)
-                    df_mean = df_mean.T
+                    # # average profiles
+                    # df_mean = df.mean(axis=0, skipna=True)
+                    # df_mean = pd.DataFrame(df_mean)
+                    # df_mean = df_mean.T
 
                     # add to the rest
                     df_mean_ = pd.concat([df_mean.reset_index(drop=True), params.reset_index(drop=True)], axis=1)
@@ -480,4 +481,4 @@ class ImageSegmentor:
             Path(os.path.dirname(ctrl_cluster_name)).mkdir(parents=True, exist_ok=True)
             imageio.imwrite(ctrl_cluster_name, ctrl_cluster)
 
-            # plt.imshow(ctrl_output)
+            plt.imshow(ctrl_output)

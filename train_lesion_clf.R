@@ -86,7 +86,7 @@ for (j in 1:length(fnames)){
   # reshape data 
   # each channel profile must have its own row for smoothing
   out <- list()
-  for (i in 1:21){
+  for (i in 1:42){
     # select data for channel
     df <- preds[((i-1)*76+1):(i*76)]
     # get channel name
@@ -95,13 +95,16 @@ for (j in 1:length(fnames)){
     color_space <- strsplit(names(df),"_") %>% lapply("[[", 2) %>% unlist() %>% unique()
     # get channel and color_space
     channel_color_space <- paste(channel, color_space, sep = "_")
+    # get type 
+    type <- strsplit(names(df),"_") %>% lapply("[[", 4) %>% unlist() %>% unique()
     # add this to the data
     names(df) <- strsplit(names(df), "_") %>% lapply("[[", 3) %>% unlist()
     df$channel <- channel
     df$color_space <- color_space
     df$channel_color_space <- channel_color_space
+    df$type <- type
     # rearrange columns
-    df <- df %>% dplyr::select(channel, color_space, channel_color_space, everything())
+    df <- df %>% dplyr::select(channel, color_space, channel_color_space, type, everything())
     # "extrapolate" by simple "extension"
     na_cols <- which(colSums(is.na(df)) > 0)
     non_na_col <- which(colSums(!is.na(df[4:length(df)])) > 0)[1] + 3
@@ -113,15 +116,15 @@ for (j in 1:length(fnames)){
   lw0 <- data.table::rbindlist(out) %>% as_tibble()
   
   # apply the moving average
-  lw_smth7 <- prospectr::movav(lw0[6:length(lw0)], w = 7)
+  lw_smth7 <- prospectr::movav(lw0[7:length(lw0)], w = 7)
   
   # reshape for summarising and plotting
-  lw_smth <- lw_smth7 %>% as_tibble() %>% bind_cols(lw0[1:5], .) %>% 
-    pivot_longer(., 6:length(.), names_to = "posY", values_to = "value") %>% 
+  lw_smth <- lw_smth7 %>% as_tibble() %>% bind_cols(lw0[1:6], .) %>% 
+    pivot_longer(., 7:length(.), names_to = "posY", values_to = "value") %>% 
     mutate(posY = as.numeric(posY))
   
   # calculate means over all profiles
-  means[[j]] <- lw_smth %>% group_by(.id, label, channel, color_space, posY) %>% 
+  means[[j]] <- lw_smth %>% group_by(.id, label, channel, color_space, posY, type) %>% 
     summarise(mean = mean(value),
               sd = sd(value))
   
@@ -417,12 +420,12 @@ cm <- confusionMatrix(m$pred$pred,m$pred$obs)
 # Extract "higher-level" features ----
 # > Breakpoint model for v_Luv ----
 ## get data
-sub1 <- all_means %>% 
-  filter(channel == "v", color_space == "Luv") %>% 
+data_v <- all_means %>% 
+  filter(channel == "v", color_space == "Luv", type=="sc") %>% 
   group_by(label, .id)
 
 ## fit breakpoint models
-data_fits <- sub1 %>%
+data_fits <- data_v %>%
   dplyr::select(.id, label, posY, mean) %>% 
   as.data.frame() %>%
   tidyr::nest(data = c(posY, mean)) %>%
@@ -445,7 +448,7 @@ ggplot(pd)+
 # > Breakpoint model for R_RGB ----
 ## get data
 data_R <- all_means %>% 
-  filter(channel == "R", color_space == "RGB") %>% 
+  filter(channel == "R", color_space == "RGB", type == "sc") %>% 
   group_by(label, .id)
 
 ## fit breakpoint models
@@ -472,7 +475,7 @@ ggplot(pd)+
 # > Logistic model for H_HSV ----
 ## get data
 data_H <- all_means %>% 
-  filter(channel == "H", color_space == "HSV") %>% 
+  filter(channel == "H", color_space == "HSV", type == "sc") %>% 
   mutate(posY = posY + 32)
 
 ## fit logistic models
@@ -544,13 +547,13 @@ data_reshape <- all_means %>%
   # do not require standard deviation
   dplyr::select(-sd) %>% 
   # create new variable
-  mutate(var = paste(channel, color_space, posY, sep = "_")) %>% 
+  mutate(var = paste(channel, color_space, posY, type, sep = "_")) %>% 
   # drop old separated variables 
-  dplyr::select(-channel, -color_space, -posY) %>% 
+  dplyr::select(-channel, -color_space, -posY, -type) %>% 
   pivot_wider(names_from = "var", values_from = "mean")
 
-drop <- paste(paste0(as.character(seq(-30, 37, by = 2)), "$"), collapse = "|")
-names_drop <- grep(drop, names(data_mod), value = TRUE)
+drop <- paste(paste0(as.character(seq(-30, 37, by = 2)), "_"), collapse = "|")
+names_drop <- grep(drop, names(data_reshape), value = TRUE)
 
 data_mod_red <- data_reshape %>% 
   # increase the distance between profile neighbouring pixels
@@ -567,7 +570,7 @@ d_mod <- data_mod_red %>%
   dplyr::select(-.id)
 
 template <- d_mod %>% dplyr::select(-label) %>% slice(1)
-write_csv(template, "Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v3.csv")
+write_csv(template, "Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")
 
 # # test without model pars
 # d_mod <- data_mod_red %>% 
@@ -595,11 +598,11 @@ plsda <- train(label ~.,
                returnResamp = "all")
 plot(plsda)
 imp <- varImp(plsda)
-imp$importance
+importance <- imp$importance
 
 ## SAVE ¨MODEL FOR IMPORT IN PYTHON
 
-MODEL_SAVE_PATH = "Output/Models/spl/pls_v3"
+MODEL_SAVE_PATH = "Output/Models/spl/pls_v4"
 DEP_LIBS = c("C:/Users/anjonas/RLibs/caret", "C:/Users/anjonas/RLibs/pls")
 
 # save

@@ -151,7 +151,11 @@ def add_image_border(img, intensity):
 
 
 def make_point_list(input):
-
+    """
+    Transform cv2 format to ordinary point list
+    :param input:
+    :return: list of point coordinates
+    """
     xs = []
     ys = []
     for point in range(len(input)):
@@ -299,6 +303,27 @@ def get_bounding_boxes(mask, check_img):
     return rect_coords, check_img
 
 
+def reject_borders(image_):
+    """
+    Removes objects that touch on image borders
+    :param image_: the binary image on which to perform the cleaning operation
+    :return: the cleaned binary image
+    """
+    out_image = image_.copy()
+    h, w = image_.shape[:2]
+    for row in range(h):
+        if out_image[row, 0] == 255:
+            cv2.floodFill(out_image, None, (0, row), 0)
+        if out_image[row, w - 1] == 255:
+            cv2.floodFill(out_image, None, (w - 1, row), 0)
+    for col in range(w):
+        if out_image[0, col] == 255:
+            cv2.floodFill(out_image, None, (col, 0), 0)
+        if out_image[h - 1, col] == 255:
+            cv2.floodFill(out_image, None, (col, h - 1), 0)
+    return out_image
+
+
 def select_roi(rect, img, mask):
     """
     Selects part of an image defined by bounding box coordinates. The selected patch is pasted onto empty masks for
@@ -319,9 +344,11 @@ def select_roi(rect, img, mask):
     # filter out the central object (i.e. lesion of interest)
     # isolate the rectangle
     patch_mask_all = mask[y:y + h, x:x + w]
+    # remove objects that touch on the border
+    patch_mask_obj = reject_borders(patch_mask_all)
 
     # select object by size or by centroid position in the patch
-    n_comps, output, stats, centroids = cv2.connectedComponentsWithStats(patch_mask_all, connectivity=8)
+    n_comps, output, stats, centroids = cv2.connectedComponentsWithStats(patch_mask_obj, connectivity=8)
 
     # if there is more then one object in the roi, need to select the one of interest
     if n_comps > 2:
@@ -335,7 +362,7 @@ def select_roi(rect, img, mask):
         if max_size > 7*sec_max:
             lesion_mask = np.uint8(np.where(output == max_idx + 1, 255, 0))
             ctr_obj = [centroids[max_idx + 1][0] + x, centroids[max_idx + 1][1] + y]
-        # if not, then select the central object
+        # if not, select the central object
         else:
             ctr_img = centroids[0:1]
             dist = cdist(centroids[1:], ctr_img)

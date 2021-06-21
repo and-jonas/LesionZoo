@@ -143,7 +143,8 @@ class TrainingPatchSelector:
 
         # handle closing of GUI without action
         if not rois:
-            os.remove(file)
+            # os.remove(file)
+            pass
 
         else:
             # iterate over all rois
@@ -200,7 +201,7 @@ class TrainingPatchSelector:
                 df.to_csv(path, index=False)
 
     def iterate_images(self):
-        files = self.get_files_to_process()
+        files = self.get_files_to_process()[50:]
         for file in files:
             img = imageio.imread(file)
             rois, data = self.define_rois(img, training_coordinates=[])

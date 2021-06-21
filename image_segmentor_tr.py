@@ -212,7 +212,7 @@ class ImageSegmentor:
             img_check = checker[1]
 
             # save data
-            prof_name = f'{dirname}/Scans/Profiles/spl_n/{trcname}.csv'
+            prof_name = f'{dirname}/Scans/Profiles/spl_n/{trcname}_iter2.csv'
             Path(os.path.dirname(prof_name)).mkdir(parents=True, exist_ok=True)
             df.to_csv(prof_name, index=False)
 

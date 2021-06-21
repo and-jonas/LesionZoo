@@ -318,31 +318,16 @@ def spline_contours(mask_obj, mask_all, img, checker):
     spline_points = utils_r.get_spline_points(contour)
 
     # get spline normals
-    # spl_n = utils.get_spline_normals(spline_points[:2])[::6]  # use old OLD points
     spl_n = utils.get_spline_normals(spline_points[2:])[::6]  # use old NEW points
 
     # CHECK OUTPUT
-    # pp = (spline_points[0].astype("int"), spline_points[1].astype("int"))  # OLD
     pp2 = (spline_points[2].astype("int"), spline_points[3].astype("int"))  # NEW
     img2 = copy.copy(img)
-    # img[pp] = (0, 0, 255)
-    # img[pp2] = (255, 0, 0)
-    # for i in range(len(spl_n)):
-    #     cv2.drawContours(img, spl_n[i], -1, (255, 0, 0), 1)
     img2[pp2] = (0, 255, 0)
     checker[pp2] = (0, 255, 0)
     checker_filtered[pp2] = (0, 255, 0)
     for i in range(len(spl_n)):
         cv2.drawContours(img2, spl_n[i], -1, (255, 0, 0), 1)
-
-    # compare
-    # fig, axs = plt.subplots(1, 2, sharex=True, sharey=True)
-    # # Show RGB and segmentation mask
-    # axs[0].imshow(img)
-    # axs[0].set_title('original patch')
-    # axs[1].imshow(img2)
-    # axs[1].set_title('original patch')
-    # plt.show(block=True)
 
     # sample the normals (on image and distance maps)
     color_profiles = extract_normals_pixel_values(img, spl_n)
@@ -361,10 +346,7 @@ def spline_contours(mask_obj, mask_all, img, checker):
     # remove normals extending into neighbor lesions
     mask_all_invert = np.bitwise_not(mask_all)
     distance_invert_all = ndi.distance_transform_edt(mask_all_invert)
-
-    dist_profiles_multi = extract_normals_pixel_values(distance_invert_all,
-                                                       spl_n)
-
+    dist_profiles_multi = extract_normals_pixel_values(distance_invert_all, spl_n)
     final_profiles, spl_n_full, spl_n_red_l = remove_neighbor_lesions(
         checked_profiles,
         dist_profiles_multi,
@@ -381,7 +363,7 @@ def spline_contours(mask_obj, mask_all, img, checker):
     for c in contours:
         cv2.drawContours(checker_filtered, c, -1, (0, 0, 255), 1)
 
-    # create the check image
+    # create check image
     for i in range(len(spl_n_full)):
         cv2.drawContours(checker, spl_n_full[i], -1, (255, 0, 0), 1)
     for i in range(len(spl_n_red_l)):

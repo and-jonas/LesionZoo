@@ -39,13 +39,18 @@ fnames_pos = list.files("TrainingData_Lesions/Positives/Segments/original/Scans/
 fnames_neg = list.files("TrainingData_Lesions/Negatives/Segments/original/Scans/Profiles/spl_n", full.names = T, pattern = ".csv")
 fnames_orig <- c(fnames_pos, fnames_neg)
 
-# gt file names (reinforce 1st iteration)
+# get file names (reinforce 1st iteration)
 fnames_pos = list.files("TrainingData_Lesions/Positives/Segments/reinforce_iter1/Scans/Profiles/spl_n", full.names = T, pattern = ".csv")
 fnames_neg = list.files("TrainingData_Lesions/Negatives/Segments/reinforce_iter1/Scans/Profiles/spl_n", full.names = T, pattern = ".csv")
 fnames_iter1 <- c(fnames_pos, fnames_neg)
 
+# get file names (reinforce 2nd iteration)
+fnames_pos = list.files("TrainingData_Lesions/Positives/Segments/reinforce_iter2/Scans/Profiles/spl_n", full.names = T, pattern = ".csv")
+fnames_neg = list.files("TrainingData_Lesions/Negatives/Segments/reinforce_iter2/Scans/Profiles/spl_n", full.names = T, pattern = ".csv")
+fnames_iter2 <- c(fnames_pos, fnames_neg)
+
 # ALL
-fnames <- c(fnames_new, fnames_orig, fnames_iter1)
+fnames <- c(fnames_new, fnames_orig, fnames_iter1, fnames_iter2)
 
 # template
 template <-  data.table::fread(fnames[1]) %>% as_tibble() %>% slice(0)
@@ -143,13 +148,13 @@ all_means <- all_means%>%
   unnest(data) %>% 
   dplyr::select(-checker)
 
-saveRDS(all_means, "Data_products/average_profiles_spl_segments_iter1.rds")
+saveRDS(all_means, "Data_products/average_profiles_spl_segments_iter2.rds")
 
 # ======================================================================================================== -
 # Plot data ----
 # ======================================================================================================== -
 
-all_means <- readRDS("Data_products/average_profiles_spl_segments_iter1.rds")
+all_means <- readRDS("Data_products/average_profiles_spl_segments_iter2.rds")
 
 # plot profiles
 plot <- ggplot(all_means) +
@@ -570,7 +575,7 @@ d_mod <- data_mod_red %>%
   dplyr::select(-.id)
 
 template <- d_mod %>% dplyr::select(-label) %>% slice(1)
-write_csv(template, "Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")
+write_csv(template, "Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v5.csv")
 
 # # test without model pars
 # d_mod <- data_mod_red %>% 
@@ -602,7 +607,7 @@ importance <- imp$importance
 
 ## SAVE ¨MODEL FOR IMPORT IN PYTHON
 
-MODEL_SAVE_PATH = "Output/Models/spl/pls_v4"
+MODEL_SAVE_PATH = "Output/Models/spl/pls_v5"
 DEP_LIBS = c("C:/Users/anjonas/RLibs/caret", "C:/Users/anjonas/RLibs/pls")
 
 # save

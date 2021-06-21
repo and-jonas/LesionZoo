@@ -54,8 +54,7 @@ print(base._libPaths())
 
 packnames = ('vctrs', 'caret', 'pls', 'segmented', 'nls.multstart', 'tidyverse')
 
-# Selectively install what needs to be install.
-# We are fancy, just because we can.
+# Selectively install what needs to be installed
 names_to_install = [x for x in packnames if not rpackages.isinstalled(x)]
 if len(names_to_install) > 0:
     rutils.install_packages(StrVector(names_to_install), dependencies=True)
@@ -168,7 +167,7 @@ class ImageSegmentor:
 
         # keep only strongly elongated objects of certain size
         mask_leaf_cl_dil_filter = utils.filter_objects_size(mask_leaf_cl_dil, 500, "smaller")
-        mask_leaf_cl_dil_filter = utils.filter_objects_size(mask_leaf_cl_dil_filter, 10000, "greater")
+        mask_leaf_cl_dil_filter = utils.filter_objects_size(mask_leaf_cl_dil_filter, 40000, "greater")
         mask_leaf_cl_dil_filter2 = utils.filter_object_elongation(mask_leaf_cl_dil_filter, threshold=0.15)
 
         # dilate kept objects to remove them from mask
@@ -231,6 +230,7 @@ class ImageSegmentor:
         for cnt in contours:
             cv2.drawContours(img_out_all_obj, [cnt], -1, (0, 0, 255), 3)
 
+        # add borders
         mask_spl = utils.add_image_border(mask_spl, intensity=0)
         mask_leaf_cl_dil_filter2 = utils.add_image_border(mask_leaf_cl_dil_filter2, intensity=0)
 
@@ -243,7 +243,7 @@ class ImageSegmentor:
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn108_15_leaf_1.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn115_14_leaf_1.png"]
         # files = ["D:/EschikonData/c3_collection/Exports/113_2_picture_8_leaf.png"]
-        # files = ["D:/LesionZoo/321_1_picture_2_leaf.png"]
+        # files = ["D:/LesionZoo/223_1_picture_6_leaf.png"]
 
         for i, file in enumerate(files):
 
@@ -252,6 +252,7 @@ class ImageSegmentor:
             # get file basename
             dirname = os.path.dirname(file)
             basename = os.path.basename(file)
+            f_name = os.path.splitext(os.path.basename(file))[0]
 
             # load image
             img = imageio.imread(file)
@@ -259,11 +260,12 @@ class ImageSegmentor:
             img = img[:, :, :3]
             img = np.ascontiguousarray(img, dtype=np.uint8)
             # output paths
-            mask_name_out = f'{dirname}/Segmented/Mask/{basename}'
-            mask_all_name_out = f'{dirname}/Segmented/Mask/allObj/{basename}'
-            mask_false_name_out = f'{dirname}/Segmented/Mask/false/{basename}'
-            ctrl_output_name = f'{dirname}/Output/V2/{basename}'
-            ctrl_cluster_name = f'{dirname}/Segmented/Clusters_loc/{basename}'
+            mask_name_out = f'{dirname}/Segmented/V3/Mask/{basename}'
+            mask_all_name_out = f'{dirname}/Segmented/V3/Mask/allObj/{basename}'
+            mask_false_name_out = f'{dirname}/Segmented/V3/Mask/false/{basename}'
+            ctrl_output_name = f'{dirname}/Output/V3/{basename}'
+            ctrl_cluster_name = f'{dirname}/Segmented/V3/Clusters_loc/{basename}'
+            num_output_name = f'{dirname}/Output/V3/edge_labs/{f_name}.csv'
 
             # ==========================================================================================================
             # IMAGE SEGMENTATION
@@ -289,8 +291,8 @@ class ImageSegmentor:
                 mask = self.segment_image(img)
                 # post process mask
                 img_out_all_obj, mask_all_obj, mask_false = self.post_process_segmentation_mask(
-                    img,
-                    mask,
+                    img=img,
+                    mask=mask,
                 )
                 # save masks
                 Path(os.path.dirname(mask_all_name_out)).mkdir(parents=True, exist_ok=True)
@@ -314,10 +316,14 @@ class ImageSegmentor:
             # image for cluster visualization
             ctrl_cluster = copy.copy(img)
 
-            # # # TEMPORARY
-            # rect = rect[3:]
+            # TEMPORARY
+            # rect = rect[20:]
 
-            # loop over all contours to process
+            # ==========================================================================================================
+            # Process lesions
+            # ==========================================================================================================
+
+            output = []
             for i in range(len(rect)):
 
                 print(f'-lesion {i + 1}/{len(rect)}')
@@ -334,6 +340,15 @@ class ImageSegmentor:
                                                                      mask_false=mask_false,
                                                                      img=empty_img,
                                                                      checker=checker)
+
+                # extract spline base points
+                x = spl_points[0].astype("int").tolist()
+                y = spl_points[1].astype("int").tolist()
+                d = {'x': x, 'y': y}
+                lesion_edge_coordinates = pd.DataFrame(data=d)
+                lesion_edge_coordinates["class"] = "undefined"
+                lesion_edge_coordinates["lesion_id"] = i+1
+                lesion_edge_coordinates["cluster_id"] = "undefined"
 
                 dists = utils.dist_to_centroid(spl_points, ctr, scale_factor=5)
 
@@ -379,27 +394,25 @@ class ImageSegmentor:
                 idx = idx[0].tolist()
                 idx = idx + [len(cl)]  # add last element
 
-                # plt.imshow(prof)
-
                 clusters = []
                 point_ids = []
-                for i in range(len(idx)):
+                for j in range(len(idx)):
                     # if is the first cluster/segment
-                    if i == 0:
+                    if j == 0:
                         # if the cluster spans the start/end of the lesion boundary, stitch the two parts together
                         if cl[0] == cl[-1]:
-                            row_identifier = list(range(0, idx[i]))+list(range(idx[len(idx)-2], len(cl)))
+                            row_identifier = list(range(0, idx[j]))+list(range(idx[len(idx)-2], len(cl)))
                         else:
-                            row_identifier = list(range(0, idx[i]))
+                            row_identifier = list(range(0, idx[j]))
                     # if is the last cluster/segment
                     else:
-                        if i == len(idx)-1:
+                        if j == len(idx)-1:
                             if cl[0] != cl[-1]:
-                                row_identifier = list(range(idx[i-1], idx[i]))
+                                row_identifier = list(range(idx[j-1], idx[j]))
                             else:
                                 continue
                         else:
-                            row_identifier = list(range(idx[i-1], idx[i]))
+                            row_identifier = list(range(idx[j-1], idx[j]))
 
                     # select corresponding color profiles
                     row_subset_identifier = col_idx_kept[row_identifier]
@@ -408,7 +421,6 @@ class ImageSegmentor:
                     clusters.append(cluster_profile)
 
                 # get ordering of columns
-                # template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames.csv")
                 template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")
                 cols = template.columns
 
@@ -417,13 +429,13 @@ class ImageSegmentor:
 
                 # create prediction for each cluster
                 predicted_label = []
-                for i, cluster in enumerate(clusters):
+                for k, cluster in enumerate(clusters):
 
                     # last cluster can be single and incomplete pixel line  --> skip
                     if cluster.shape[1] == 1:
                         continue
 
-                    print(f'-----cluster {i + 1}/{len(clusters)}')
+                    print(f'-----cluster {k + 1}/{len(clusters)}')
 
                     # extract scaled and raw color profiles
                     df_sc = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
@@ -441,17 +453,6 @@ class ImageSegmentor:
                         print("Encountered problem while extracting model parameters!")
                         continue
 
-                    # # get the color profiles and select the relevant columns (used to create a prediction)
-                    # # df = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
-                    # df_ = df.iloc[:, 1:]
-                    # df_ = df_.iloc[:, ::2]
-                    # df_ = df_[df_.columns.drop(list(df_.filter(regex='L_Lab|YCC')))]
-
-                    # # average profiles
-                    # df_mean = df.mean(axis=0, skipna=True)
-                    # df_mean = pd.DataFrame(df_mean)
-                    # df_mean = df_mean.T
-
                     # add to the rest
                     df_mean_ = pd.concat([df_mean.reset_index(drop=True), params.reset_index(drop=True)], axis=1)
 
@@ -468,17 +469,46 @@ class ImageSegmentor:
                     predicted_label.append(pred_lab)
 
                     # map prediction to contour for graphical evaluation
-                    for p in point_ids[i]:
+                    # and produce numerical output
+                    for p in point_ids[k]:
                         coords = tuple([int(spl_points[1][p]), int(spl_points[0][p])])
                         if pred_lab == "neg":
                             cv2.circle(ctrl_output, coords, 1, (0, 0, 255), -1)
                         elif pred_lab == "pos":
                             cv2.circle(ctrl_output, coords, 1, (255, 0, 0), -1)
+                        lesion_edge_coordinates.iloc[p, 2] = pred_lab
+                        lesion_edge_coordinates.iloc[p, 4] = k+1
 
+                output.append(lesion_edge_coordinates)
+            if len(output) == 0:
+                data = lesion_edge_coordinates
+            else:
+                data = pd.concat(output)
+
+            # Save output
+            Path(os.path.dirname(num_output_name)).mkdir(parents=True, exist_ok=True)
+            data.to_csv(num_output_name, index=False)
             Path(os.path.dirname(ctrl_output_name)).mkdir(parents=True, exist_ok=True)
             imageio.imwrite(ctrl_output_name, ctrl_output)
+            # Path(os.path.dirname(ctrl_cluster_name)).mkdir(parents=True, exist_ok=True)
+            # imageio.imwrite(ctrl_cluster_name, ctrl_cluster)
 
-            Path(os.path.dirname(ctrl_cluster_name)).mkdir(parents=True, exist_ok=True)
-            imageio.imwrite(ctrl_cluster_name, ctrl_cluster)
+# ======================================================================================================================
+# CHECK OUTPUT
+# ======================================================================================================================
+#
+# data = pd.read_csv("D:/LesionZoo/Output/V3/edge_labs/223_1_picture_6_leaf.csv")
+#
+# for index, row in data.iterrows():
+#     coords = tuple([row['y'], row['x']])
+#     label = row['class']
+#     if label == "neg":
+#         cv2.circle(ctrl_output, coords, 1, (0, 0, 255), -1)
+#     elif label == "pos":
+#         cv2.circle(ctrl_output, coords, 1, (255, 0, 0), -1)
+#     elif label == "undefined":
+#         cv2.circle(ctrl_output, coords, 1, (0, 0, 0), -1)
+#
+# plt.imshow(ctrl_output)
 
-            plt.imshow(ctrl_output)
+# ======================================================================================================================

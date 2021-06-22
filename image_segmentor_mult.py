@@ -19,6 +19,9 @@ import utils
 import pandas as pd
 import numpy as np
 
+import multiprocessing
+from multiprocessing import Manager, Process
+
 # IF WORKING ON REMOTE    <===== !!!
 os.environ['R_HOME'] = 'C:/Users/anjonas/Documents/R/R-3.6.2'
 
@@ -70,15 +73,46 @@ r_getparams = robjects.globalenv['get_params']
 
 # ======================================================================================================================
 
+# def prepare_descriptor_worker(work_queue, result, path_workspace):
+#
+#     for job in iter(work_queue.get, 'STOP'):
+#         image_name = job['image_name']
+#         image_path = job['image_path']
+#
+#         img = imageio.imread(str(image_path))
+#
+#         mask = segment_image(model=model,
+#                              img=img)
+#
+#         imageio.imwrite()
+
 
 class ImageSegmentor:
 
-    def __init__(self, dir_positives, dir_negatives, dir_model, save_output, file_index):
-        self.dir_positives = dir_positives
-        self.dir_negatives = dir_negatives
-        self.dir_model = dir_model
-        self.save_output = save_output
-        self.file_index = file_index
+    def __init__(self, dir_to_process, dir_output, dir_model):
+
+        self.dir_to_process = Path(dir_to_process)
+        self.dir_model = Path(dir_model)
+        # set output paths
+        self.path_output = Path(dir_output)
+        self.path_mask = self.path_output / "Mask" / "Obj"
+        self.path_mask_all = self.path_output / "Mask" / "AllObj"
+        self.path_mask_false = self.path_output / "Mask" / "FalseObj"
+        self.path_overlay = self.path_output / "Overlay" / "Segmentation"
+        self.path_ctrl_output = self.path_output / "Control" / "Final"
+        self.path_ctrl_cluster = self.path_output / "Control" / "Cluster"
+        self.path_num_output_name = self.path_output / "Control" / "csv"
+
+    def prepare_workspace(self):
+
+        self.path_output.mkdir(parents=True, exist_ok=True)
+        self.path_mask.mkdir(parents=True, exist_ok=True)
+        self.path_mask_all.mkdir(parents=True, exist_ok=True)
+        self.path_mask_false.mkdir(parents=True, exist_ok=True)
+        self.path_overlay.mkdir(parents=True, exist_ok=True)
+        self.path_ctrl_output.mkdir(parents=True, exist_ok=True)
+        self.path_ctrl_cluster.mkdir(parents=True, exist_ok=True)
+        self.path_num_output_name.mkdir(parents=True, exist_ok=True)
 
     def file_feed(self):
 
@@ -235,10 +269,250 @@ class ImageSegmentor:
 
         return img_out_all_obj, mask_spl, mask_leaf_cl_dil_filter2
 
+    def process_image(self, work_queue, result):
 
+        for job in iter(work_queue.get, 'STOP'):
 
+            image_name = job['image_name']
+            img_name = image_name
+            image_path = job['image_path']
 
+            # ==========================================================================================================
+            # Segment image
+            # ==========================================================================================================
 
+            check_output_path = self.path_mask_all / (image_name + '.png')
+
+            # check if output exists - load from disk
+            if check_output_path.exists():
+                print("Image", image_name, "already segmented, skip")
+                img = imageio.imread(str(image_path))
+                mask_all = imageio.imread(self.path_mask_all / (image_name + '.png'))
+                mask_false = imageio.imread(self.path_mask_false / (image_name + '.png'))
+
+            # load, segment and post-process image
+            else:
+                # load image
+                img = imageio.imread(str(image_path))
+
+                # segment image
+                mask = self.segment_image(img=img)
+
+                # post-process mask
+                overlay_all, mask_all, mask_false = self.post_process_segmentation_mask(img=img, mask=mask)
+
+                # save output
+                imageio.imwrite(self.path_overlay / (image_name + '.png'), overlay_all)
+                imageio.imwrite(self.path_mask_all / (image_name + '.png'), mask_all)
+                imageio.imwrite(self.path_mask_false / (image_name + '.png'), mask_false)
+
+            img = utils.add_image_border(img, intensity=255)
+            check_img = copy.copy(img)
+
+            # ==========================================================================================================
+            # Process lesions
+            # ==========================================================================================================
+
+            # get bounding boxes of all lesions
+            rect, check_img = utils.get_bounding_boxes(mask_all, check_img)
+
+            # image for output visualization
+            ctrl_output = copy.copy(img)
+            # draw all contours
+            _, contours, _ = cv2.findContours(mask_all, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+            for contour in contours:
+                cv2.drawContours(ctrl_output, contour, -1, (0, 0, 0), 1)
+
+            # image for cluster visualization
+            ctrl_cluster = copy.copy(img)
+
+            output = []
+            for i in range(len(rect)):
+
+                print(f'-lesion {i + 1}/{len(rect)}')
+
+                # extract roi
+                empty_mask_all, empty_mask, empty_img, ctr = utils.select_roi(rect=rect[i],
+                                                                              img=img,
+                                                                              mask=mask_all)
+
+                # extract RGB profiles
+                checker = copy.copy(img)
+                prof, checker, spl, spl_points = fef.spline_contours(mask_obj=empty_mask,
+                                                                     mask_all=empty_mask_all,
+                                                                     mask_false=mask_false,
+                                                                     img=empty_img,
+                                                                     checker=checker)
+
+                # extract spline base points
+                x = spl_points[0].astype("int").tolist()
+                y = spl_points[1].astype("int").tolist()
+                d = {'x': x, 'y': y}
+                lesion_edge_coordinates = pd.DataFrame(data=d)
+                lesion_edge_coordinates["class"] = "undefined"
+                lesion_edge_coordinates["lesion_id"] = i+1
+                lesion_edge_coordinates["cluster_id"] = "undefined"
+
+                dists = utils.dist_to_centroid(spl_points, ctr, scale_factor=5)
+
+                df, col_idx_kept, fig = fef.cluster_profiles(
+                    profiles=prof,
+                    distances=dists,
+                    min_length_profile=60
+                )
+                # if i == 0:
+                #     Path(os.path.dirname(cluster_name)).mkdir(parents=True, exist_ok=True)
+                #     fig.figure.savefig(cluster_name, dpi=2400)
+                plt.close()
+
+                # if there are no complete profiles, fef.cluster_profiles() returns df = None
+                # these lesions are not analyzed
+                if df is None:
+                    continue
+
+                # generate some colors
+                colors = []
+                n_clust = len(df['Cluster'].unique())
+                for k in range(n_clust):
+                    colors.append(utils.random_color())
+
+                # draw all kept contour normals
+                for idx in col_idx_kept:
+                    row = df.loc[df['row_ind'] == idx]
+                    clst = int(row.iloc[0]['Cluster'])
+                    cv2.drawContours(ctrl_cluster, spl[0][idx], -1, colors[clst], 1)
+
+                # draw all contours
+                _, contours, _ = cv2.findContours(mask_all, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+                for contour in contours:
+                    cv2.drawContours(ctrl_cluster, contour, -1, (0, 0, 255), 1)
+
+                # ======================================================================================================
+
+                # split full sampled profile into spatial clusters of profiles
+                clusters, point_ids = fef.split_spatial_clusters(data=df,
+                                                                 profile=prof,
+                                                                 column_idx=col_idx_kept)
+
+                # get ordering of columns
+                template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")
+                cols = template.columns
+
+                # create prediction for each cluster
+                predicted_label = []
+                for k, cluster in enumerate(clusters):
+
+                    # last cluster can be single and incomplete pixel line  --> skip
+                    if cluster.shape[1] == 1:
+                        continue
+
+                    print(f'-----cluster {k + 1}/{len(clusters)}')
+
+                    # extract scaled and raw color profiles
+                    df_sc = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
+                    df_raw = fef.get_color_profiles(cluster, scale=False, smooth=7, remove_missing=True)
+                    df = pd.concat([df_sc, df_raw], axis=1, ignore_index=False)
+                    # average profiles
+                    df_mean = df.mean(axis=0, skipna=True)
+                    df_mean = pd.DataFrame(df_mean)
+                    df_mean = df_mean.T
+                    # df_mean.to_csv("Z:/Public/Jonas/001_LesionZoo/test.csv", index=False)
+                    # get higher-level features
+                    try:
+                        params = r_getparams(dat=df_mean)
+                    except:
+                        print("Encountered problem while extracting model parameters!")
+                        continue
+
+                    # add to the rest
+                    df_mean_ = pd.concat([df_mean.reset_index(drop=True), params.reset_index(drop=True)], axis=1)
+
+                    # reorder columns
+                    df_mean = df_mean_[cols]
+
+                    # make prediction
+                    pred = robjects.r.predict(model, df_mean)
+
+                    try:
+                        pred_lab = pred[0]
+                    except IndexError:
+                        continue
+                    predicted_label.append(pred_lab)
+
+                    # map prediction to contour for graphical evaluation
+                    # and produce numerical output
+                    for p in point_ids[k]:
+                        coords = tuple([int(spl_points[1][p]), int(spl_points[0][p])])
+                        if pred_lab == "neg":
+                            cv2.circle(ctrl_output, coords, 1, (0, 0, 255), -1)
+                        elif pred_lab == "pos":
+                            cv2.circle(ctrl_output, coords, 1, (255, 0, 0), -1)
+                        lesion_edge_coordinates.iloc[p, 2] = pred_lab
+                        lesion_edge_coordinates.iloc[p, 4] = k+1
+
+                output.append(lesion_edge_coordinates)
+            if len(output) == 0:
+                data = lesion_edge_coordinates
+            else:
+                data = pd.concat(output)
+
+            # Save output
+            data.to_csv(self.path_num_output_name / (image_name + '.csv'), index=False)
+            imageio.imwrite(self.path_ctrl_output / (image_name + '.png'), ctrl_output)
+            result.put(img_name)
+
+    def run(self):
+
+        self.prepare_workspace()
+
+        files = list(self.dir_to_process.glob("*.png"))
+
+        image_paths = {}
+        for i, file in enumerate(files):
+            image_name = Path(file).stem
+
+            image_path = self.dir_to_process / (image_name + ".png")
+
+            image_paths[image_name] = image_path
+
+        if len(image_paths) > 0:
+
+            # make job and results queue
+            m = Manager()
+            jobs = m.Queue()
+            results = m.Queue()
+            processes = []
+            # Progress bar counter
+            max_jobs = len(image_paths)
+            count = 0
+
+            # Build up job queue
+            for image_name, image_path in image_paths.items():
+                print(image_name, "to queue")
+
+                job = dict()
+                job['image_name'] = image_name
+                job['image_path'] = image_path
+                jobs.put(job)
+
+            # Start processes
+            for w in range(multiprocessing.cpu_count() - 1):
+                p = Process(target=self.process_image,
+                            args=(jobs, results))
+                p.daemon = True
+                p.start()
+                processes.append(p)
+                jobs.put('STOP')
+
+            print("jobs all started," + str(multiprocessing.cpu_count() - 1) + " workers")
+
+            # Get results and increment counter along with it
+            while count < max_jobs:
+                img_names = results.get()
+                count += 1
+
+            for p in processes:
+                p.join()
 
     def iterate_images(self, img_type):
 
@@ -390,7 +664,39 @@ class ImageSegmentor:
 
                 # ======================================================================================================
 
-                clusters, point_ids = fef.split_spatial_clusters(data=df, profile=prof, column_idx=col_idx_kept)
+                # find breakpoints in cluster labels
+                cl = df['Cluster'].tolist()
+                diffs = np.ediff1d(cl)
+                idx = np.where(diffs != 0)
+                idx = [i + 1 for i in idx]
+                idx = idx[0].tolist()
+                idx = idx + [len(cl)]  # add last element
+
+                clusters = []
+                point_ids = []
+                for j in range(len(idx)):
+                    # if is the first cluster/segment
+                    if j == 0:
+                        # if the cluster spans the start/end of the lesion boundary, stitch the two parts together
+                        if cl[0] == cl[-1]:
+                            row_identifier = list(range(0, idx[j]))+list(range(idx[len(idx)-2], len(cl)))
+                        else:
+                            row_identifier = list(range(0, idx[j]))
+                    # if is the last cluster/segment
+                    else:
+                        if j == len(idx)-1:
+                            if cl[0] != cl[-1]:
+                                row_identifier = list(range(idx[j-1], idx[j]))
+                            else:
+                                continue
+                        else:
+                            row_identifier = list(range(idx[j-1], idx[j]))
+
+                    # select corresponding color profiles
+                    row_subset_identifier = col_idx_kept[row_identifier]
+                    point_ids.append(row_subset_identifier)
+                    cluster_profile = prof[:, row_subset_identifier, :]
+                    clusters.append(cluster_profile)
 
                 # get ordering of columns
                 template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")

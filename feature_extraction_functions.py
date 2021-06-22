@@ -564,7 +564,7 @@ def cluster_complete_profiles(data):
     if n_profs > 20:
 
         # maximum number of clusters to evaluate
-        max_n_clust = int(np.ceil(data.shape[0] / 30))
+        max_n_clust = int(np.ceil(data.shape[0] / 50))
 
         # cluster data into various numbers of cluster
         # to speed up, only certain candidate numbers of clusters are evaluated, with increasing spacing for larger
@@ -586,8 +586,8 @@ def cluster_complete_profiles(data):
         avg_SS = [sum(d) / data.shape[0] for d in dist]
 
         # get the "optimal" number of clusters
-        if any(avg_SS) < 1.0:
-            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 1.0)
+        if any(z < 1.25 for z in avg_SS):
+            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 1.25)
         else:
             best_n_clust = max_n_clust
 
@@ -692,6 +692,46 @@ def assign_incomplete_profiles(profile, full_profile, data_complete, data_partia
     fig = plot_color_profile_clusters(kept_profiles, plot_dat)
 
     return df, all_kept_cols, fig
+
+
+def split_spatial_clusters(data, profile, column_idx):
+
+    # find breakpoints in cluster labels
+    cl = data['Cluster'].tolist()
+    diffs = np.ediff1d(cl)
+    idx = np.where(diffs != 0)
+    idx = [i + 1 for i in idx]
+    idx = idx[0].tolist()
+    idx = idx + [len(cl)]  # add last element
+
+    # split clusters along identified breakpoints
+    clusters = []
+    point_ids = []
+    for j in range(len(idx)):
+        # if is the first cluster/segment
+        if j == 0:
+            # if the cluster spans the start/end of the lesion boundary, stitch the two parts together
+            if cl[0] == cl[-1]:
+                row_identifier = list(range(0, idx[j])) + list(range(idx[len(idx) - 2], len(cl)))
+            else:
+                row_identifier = list(range(0, idx[j]))
+        # if is the last cluster/segment
+        else:
+            if j == len(idx) - 1:
+                if cl[0] != cl[-1]:
+                    row_identifier = list(range(idx[j - 1], idx[j]))
+                else:
+                    continue
+            else:
+                row_identifier = list(range(idx[j - 1], idx[j]))
+
+        # select corresponding color profiles
+        row_subset_identifier = column_idx[row_identifier]
+        point_ids.append(row_subset_identifier)
+        cluster_profile = profile[:, row_subset_identifier, :]
+        clusters.append(cluster_profile)
+
+    return clusters, point_ids
 
 
 def cluster_profiles(profiles, distances, min_length_profile=60):

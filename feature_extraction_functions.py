@@ -556,7 +556,7 @@ def cluster_complete_profiles(data):
     :return: The same dataFrame, with the cluster index for the color profiles as an additional column, the cluster
     centroid coordinates (required for assignment of incomplete profiles to clusters).
     """
-    print("---clustering profiles...")
+    # print("---clustering profiles...")
 
     # get number of complete profiles
     n_profs = data.shape[0]
@@ -586,12 +586,12 @@ def cluster_complete_profiles(data):
         avg_SS = [sum(d) / data.shape[0] for d in dist]
 
         # get the "optimal" number of clusters
-        if any(z < 0.5 for z in avg_SS):
-            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 0.5) + 1
+        if any(z < 0.75 for z in avg_SS):
+            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 0.75) + 1
         else:
             best_n_clust = max_n_clust
 
-        print(f'----making {best_n_clust} clusters')  # get cluster centroids
+        # print(f'----making {best_n_clust} clusters')  # get cluster centroids
 
         # perform k-means clustering on profiles, into identified optimal number of clusters
         k_means = KMeans(n_clusters=best_n_clust, random_state=0).fit(data)
@@ -695,7 +695,13 @@ def assign_incomplete_profiles(profile, full_profile, data_complete, data_partia
 
 
 def split_spatial_clusters(data, profile, column_idx):
-
+    """
+    Splits the full profile into spatially continous clustered profiles
+    :param data: Output dataframe from fef.cluster_profiles()
+    :param profile: The maintained profiles as returned by fef.spline_contours()
+    :param column_idx: List of indices indicating the maintained profiles
+    :return: List of profiles corresponding to the clusters
+    """
     # find breakpoints in cluster labels
     cl = data['Cluster'].tolist()
     diffs = np.ediff1d(cl)

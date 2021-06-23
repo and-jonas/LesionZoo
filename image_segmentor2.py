@@ -403,8 +403,9 @@ class ImageSegmentor:
                 predicted_label = []
                 for k, cluster in enumerate(clusters):
 
-                    # last cluster can be single and incomplete pixel line  --> skip
-                    if cluster.shape[1] == 1:
+                    # if cluster consists of very few profiles, skip
+                    # labels will be inferred from neighbours or none assigned if spatially isolated
+                    if cluster.shape[1] <= 3:
                         continue
 
                     print(f'-----cluster {k + 1}/{len(clusters)}')

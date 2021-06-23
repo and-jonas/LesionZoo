@@ -5,9 +5,14 @@
 # Date: 15.03.2021
 # ======================================================================================================================
 
+import sys
+
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
+
 import pickle
 import copy
-import glob
 import os
 from pathlib import Path
 import imageio
@@ -52,7 +57,7 @@ base = importr('base')
 
 # # IF WORKING LOCALLY    <===== !!!
 # base._libPaths("C:/Users/anjonas/Documents/R3Libs")
-print(base._libPaths())
+# print(base._libPaths())
 
 packnames = ('vctrs', 'caret', 'pls', 'segmented', 'nls.multstart', 'tidyverse')
 
@@ -88,10 +93,13 @@ class ImageSegmentor:
         self.path_overlay = self.path_output / "Overlay" / "Segmentation"
         self.path_ctrl_output = self.path_output / "Control" / "Final"
         self.path_ctrl_cluster = self.path_output / "Control" / "Cluster"
+        self.path_result_cluster = self.path_output / "Control" / "Clusters"
         self.path_num_output_name = self.path_output / "Control" / "csv"
 
     def prepare_workspace(self):
-
+        """
+        Creates all required output directories
+        """
         self.path_output.mkdir(parents=True, exist_ok=True)
         self.path_mask.mkdir(parents=True, exist_ok=True)
         self.path_mask_all.mkdir(parents=True, exist_ok=True)
@@ -99,16 +107,8 @@ class ImageSegmentor:
         self.path_overlay.mkdir(parents=True, exist_ok=True)
         self.path_ctrl_output.mkdir(parents=True, exist_ok=True)
         self.path_ctrl_cluster.mkdir(parents=True, exist_ok=True)
+        self.path_result_cluster.mkdir(parents=True, exist_ok=True)
         self.path_num_output_name.mkdir(parents=True, exist_ok=True)
-
-    def file_feed(self):
-
-        # get all files and their paths
-        files_pos = glob.glob(f'{self.dir_positives}/*.png')
-        files_neg = glob.glob(f'{self.dir_negatives}/*.png')
-        all_files = files_pos + files_neg
-
-        return all_files
 
     def segment_image(self, img):
         """
@@ -116,7 +116,7 @@ class ImageSegmentor:
         :param img: The image to be processed.
         :return: The resulting binary segmentation mask.
         """
-        print('-segmenting image')
+        # print('-segmenting image')
 
         # load model
         with open(self.dir_model, 'rb') as model:
@@ -268,11 +268,10 @@ class ImageSegmentor:
             # Segment image
             # ==========================================================================================================
 
-            check_output_path = self.path_mask_all / (image_name + '.png')
-
             # check if output exists - load from disk
+            check_output_path = self.path_mask_all / (image_name + '.png')
             if check_output_path.exists():
-                print("Image", image_name, "already segmented, skip")
+                # print("Image", image_name, "already segmented, skip")
                 img = imageio.imread(str(image_path))
                 mask_all = imageio.imread(self.path_mask_all / (image_name + '.png'))
                 mask_false = imageio.imread(self.path_mask_false / (image_name + '.png'))
@@ -280,7 +279,7 @@ class ImageSegmentor:
             # load, segment and post-process image
             else:
                 # load image
-                print("loading masks from disk")
+                # print("loading masks from disk")
                 img = imageio.imread(str(image_path))
 
                 # segment image
@@ -317,7 +316,7 @@ class ImageSegmentor:
             output = []
             for i in range(len(rect)):
 
-                print(f'-lesion {i + 1}/{len(rect)}')
+                # print(f'-lesion {i + 1}/{len(rect)}')
 
                 # extract roi
                 empty_mask_all, empty_mask, empty_img, ctr = utils.select_roi(rect=rect[i],
@@ -332,7 +331,7 @@ class ImageSegmentor:
                                                                      img=empty_img,
                                                                      checker=checker)
 
-                # extract spline base points
+                # initialize output data frame
                 x = spl_points[0].astype("int").tolist()
                 y = spl_points[1].astype("int").tolist()
                 d = {'x': x, 'y': y}
@@ -341,6 +340,8 @@ class ImageSegmentor:
                 lesion_edge_coordinates["lesion_id"] = i+1
                 lesion_edge_coordinates["cluster_id"] = "undefined"
 
+                # extract pixel distances of spline base points from object centroid
+                # and scale to attribute weight in clustering
                 dists = utils.dist_to_centroid(spl_points, ctr, scale_factor=5)
 
                 df, col_idx_kept, fig = fef.cluster_profiles(
@@ -348,9 +349,12 @@ class ImageSegmentor:
                     distances=dists,
                     min_length_profile=60
                 )
-                # if i == 0:
-                #     Path(os.path.dirname(cluster_name)).mkdir(parents=True, exist_ok=True)
-                #     fig.figure.savefig(cluster_name, dpi=2400)
+                # save clusters for first lesion for inspection
+                if i == 0:
+                    try:
+                        fig.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
+                    except AttributeError:
+                        fig.figure.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
                 plt.close()
 
                 # if there are no complete profiles, fef.cluster_profiles() returns df = None
@@ -390,11 +394,12 @@ class ImageSegmentor:
                 predicted_label = []
                 for k, cluster in enumerate(clusters):
 
-                    # last cluster can be single and incomplete pixel line  --> skip
-                    if cluster.shape[1] == 1:
+                    # if cluster consists of very few profiles, skip
+                    # labels will be inferred from neighbours or none assigned if spatially isolated
+                    if cluster.shape[1] <= 3:
                         continue
 
-                    print(f'-----cluster {k + 1}/{len(clusters)}')
+                    # print(f'-----cluster {k + 1}/{len(clusters)}')
 
                     # extract scaled and raw color profiles
                     df_sc = fef.get_color_profiles(cluster, scale=True, smooth=7, remove_missing=True)
@@ -409,7 +414,7 @@ class ImageSegmentor:
                     try:
                         params = r_getparams(dat=df_mean)
                     except:
-                        print("Encountered problem while extracting model parameters!")
+                        # print("Encountered problem while extracting model parameters!")
                         continue
 
                     # add to the rest
@@ -447,24 +452,27 @@ class ImageSegmentor:
             # Save output
             data.to_csv(self.path_num_output_name / (image_name + '.csv'), index=False)
             imageio.imwrite(self.path_ctrl_output / (image_name + '.png'), ctrl_output)
+            imageio.imwrite(self.path_ctrl_cluster / (image_name + '.png'), ctrl_cluster)
             result.put(img_name)
 
     def run(self):
 
         self.prepare_workspace()
-
         files = list(self.dir_to_process.glob("*.png"))
-
         image_paths = {}
         for i, file in enumerate(files):
             image_name = Path(file).stem
 
-            image_path = self.dir_to_process / (image_name + ".png")
-
-            image_paths[image_name] = image_path
+            # test if already processed - skip
+            final_output_path = self.path_num_output_name / (image_name + '.csv')
+            if final_output_path.exists():
+                continue
+            # otherwise add to jobs list
+            else:
+                image_path = self.dir_to_process / (image_name + ".png")
+                image_paths[image_name] = image_path
 
         if len(image_paths) > 0:
-
             # make job and results queue
             m = Manager()
             jobs = m.Queue()
@@ -477,7 +485,6 @@ class ImageSegmentor:
             # Build up job queue
             for image_name, image_path in image_paths.items():
                 print(image_name, "to queue")
-
                 job = dict()
                 job['image_name'] = image_name
                 job['image_path'] = image_path
@@ -492,12 +499,13 @@ class ImageSegmentor:
                 processes.append(p)
                 jobs.put('STOP')
 
-            print("jobs all started," + str(multiprocessing.cpu_count() - 1) + " workers")
+            print(str(len(image_paths)) + " jobs started, " + str(multiprocessing.cpu_count() - 1) + " workers")
 
             # Get results and increment counter along with it
             while count < max_jobs:
                 img_names = results.get()
                 count += 1
+                print("processed " + str(count) + "/" + str(max_jobs))
 
             for p in processes:
                 p.join()

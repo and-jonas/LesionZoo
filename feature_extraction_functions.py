@@ -101,6 +101,30 @@ def plot_color_profile_clusters(cimg, profiles):
     return fig
 
 
+def plot_color_profile_clusters2(clusters):
+    """
+    Plot clustered color profiles, contained in list
+    :param clusters: list of color profiles, each list element corresponding to one spatial cluster
+    :return: plot
+    """
+    n_clusters = len(clusters)
+    fig, axs = plt.subplots(1, n_clusters, sharex=False, sharey=False)
+    fig.subplots_adjust(hspace=.001, wspace=.1)
+    if n_clusters > 1:
+        axs = axs.ravel()
+
+    if n_clusters > 1:
+        for i in range(n_clusters):
+            cimg_temp = clusters[i]
+            # Show RGB and segmentation mask
+            axs[i].imshow(cimg_temp)
+            axs[i].set_title(f'Cluster {i}')
+    else:
+        fig = plt.imshow(clusters[0])
+
+    return fig
+
+
 def extract_normals_pixel_values(img, normals):
     """
     Extracts the pixel values situated on the spline normals.
@@ -586,8 +610,8 @@ def cluster_complete_profiles(data):
         avg_SS = [sum(d) / data.shape[0] for d in dist]
 
         # get the "optimal" number of clusters
-        if any(z < 0.75 for z in avg_SS):
-            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 0.75) + 1
+        if any(z < 0.5 for z in avg_SS):
+            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 0.5) + 1
         else:
             best_n_clust = max_n_clust
 
@@ -609,7 +633,7 @@ def cluster_complete_profiles(data):
 
 
 def assign_incomplete_profiles(profile, full_profile, data_complete, data_partial, col_idx_complete, col_idx_partial,
-                               centroids):
+                               centroids, plot):
     """
     Assigns incomplete color profiles (extending into sphere of neighbouring lesions, or extending beyond leaf edge) to
     the closest cluster determined previously
@@ -620,6 +644,7 @@ def assign_incomplete_profiles(profile, full_profile, data_complete, data_partia
     :param col_idx_complete: A list of indices of the complete color profiles
     :param col_idx_partial: A list of indices of the incomplete color profiles
     :param centroids: The centroid coordinates in feature space, resulting from fef.cluster_complete_profiles()
+    :param plot: boolean, whether the clustered profiles are plotted
     :return: df, all_kept_cols, fig
     """
     # length of a profile in pixels
@@ -681,15 +706,20 @@ def assign_incomplete_profiles(profile, full_profile, data_complete, data_partia
     df.sort_values("row_ind", inplace=True)
     df = df.reset_index(drop=True)
 
-    plot_dat = df.iloc[:, :int(data_complete.shape[1]-2)]
-    cl = df[['Cluster']]
-    plot_dat = pd.concat([plot_dat.reset_index(drop=True), cl], axis=1)
-
-    # plot clustered profiles
     all_kept_cols = np.concatenate([col_idx_complete, col_idx_partial])
     all_kept_cols.sort()
-    kept_profiles = full_profile[:, all_kept_cols, :]
-    fig = plot_color_profile_clusters(kept_profiles, plot_dat)
+
+    if plot:
+        # get data
+        plot_dat = df.iloc[:, :int(data_complete.shape[1]-2)]
+        cl = df[['Cluster']]
+        plot_dat = pd.concat([plot_dat.reset_index(drop=True), cl], axis=1)
+
+        # plot clustered profiles
+        kept_profiles = full_profile[:, all_kept_cols, :]
+        fig = plot_color_profile_clusters(kept_profiles, plot_dat)
+    else:
+        fig = None
 
     return df, all_kept_cols, fig
 
@@ -740,13 +770,14 @@ def split_spatial_clusters(data, profile, column_idx):
     return clusters, point_ids
 
 
-def cluster_profiles(profiles, distances, min_length_profile=60):
+def cluster_profiles(profiles, distances, min_length_profile=60, plot=False):
     """
     Groups similar (and near-by) color profiles by k-means clustering.
     :param profiles: The color profile image resulting from fef.spline_contours()
     :param distances: The distances between the spline normal basepoints and the lesion centroid, resulting from
     utils.dist_to_centroids().
     :param min_length_profile: The mimimum length a color profile must have to be assigned to a cluster.
+    :param plot: Boolean, whether the clustered profiles should be plotted.
     :return: A dataframe with the pixel values, the position relative to the centroid, and the cluster index;
     A list of indices, indicating which color profiles were kept; and a figure of the clusters for one lesion.
     """
@@ -802,7 +833,8 @@ def cluster_profiles(profiles, distances, min_length_profile=60):
                 data_partial=df_partial,
                 col_idx_complete=cols_keep_complete,
                 col_idx_partial=cols_keep,
-                centroids=centroids
+                centroids=centroids,
+                plot=plot
             )
 
         else:

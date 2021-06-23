@@ -347,14 +347,15 @@ class ImageSegmentor:
                 df, col_idx_kept, fig = fef.cluster_profiles(
                     profiles=prof,
                     distances=dists,
-                    min_length_profile=60
+                    min_length_profile=60,
+                    plot=False
                 )
-                # save clusters for first lesion for inspection
-                if i == 0:
-                    try:
-                        fig.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
-                    except AttributeError:
-                        fig.figure.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
+                # # save clusters for first lesion for inspection
+                # if i == 0:
+                #     try:
+                #         fig.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
+                #     except AttributeError:
+                #         fig.figure.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
                 plt.close()
 
                 # if there are no complete profiles, fef.cluster_profiles() returns df = None
@@ -385,6 +386,15 @@ class ImageSegmentor:
                 clusters, point_ids = fef.split_spatial_clusters(data=df,
                                                                  profile=prof,
                                                                  column_idx=col_idx_kept)
+
+                # save clusters for first lesion for inspection
+                if i == 0:
+                    fig = fef.plot_color_profile_clusters2(clusters)
+                    try:
+                        fig.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
+                    except AttributeError:
+                        fig.figure.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
+                plt.close()
 
                 # get ordering of columns
                 template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")

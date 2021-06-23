@@ -359,11 +359,15 @@ class ImageSegmentor:
                 df, col_idx_kept, fig = fef.cluster_profiles(
                     profiles=prof,
                     distances=dists,
-                    min_length_profile=60
+                    min_length_profile=60,
+                    plot=False
                 )
+                # # save clusters for first lesion for inspection
                 # if i == 0:
-                #     Path(os.path.dirname(cluster_name)).mkdir(parents=True, exist_ok=True)
-                #     fig.figure.savefig(cluster_name, dpi=2400)
+                #     try:
+                #         fig.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
+                #     except AttributeError:
+                #         fig.figure.savefig(self.path_result_cluster / (image_name + '.png'), dpi=2400)
                 plt.close()
 
                 # if there are no complete profiles, fef.cluster_profiles() returns df = None

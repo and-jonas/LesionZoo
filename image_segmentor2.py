@@ -321,7 +321,7 @@ class ImageSegmentor:
             ctrl_cluster = copy.copy(img)
 
             # TEMPORARY
-            # rect = rect[20:]
+            rect = rect[2:]
 
             # ==========================================================================================================
             # Process lesions

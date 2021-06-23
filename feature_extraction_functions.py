@@ -564,7 +564,7 @@ def cluster_complete_profiles(data):
     if n_profs > 20:
 
         # maximum number of clusters to evaluate
-        max_n_clust = int(np.ceil(data.shape[0] / 50))
+        max_n_clust = int(np.ceil(data.shape[0] / 30))
 
         # cluster data into various numbers of cluster
         # to speed up, only certain candidate numbers of clusters are evaluated, with increasing spacing for larger
@@ -586,8 +586,8 @@ def cluster_complete_profiles(data):
         avg_SS = [sum(d) / data.shape[0] for d in dist]
 
         # get the "optimal" number of clusters
-        if any(z < 1.25 for z in avg_SS):
-            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 1.25)
+        if any(z < 0.5 for z in avg_SS):
+            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 0.5) + 1
         else:
             best_n_clust = max_n_clust
 

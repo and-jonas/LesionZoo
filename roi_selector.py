@@ -201,8 +201,9 @@ class TrainingPatchSelector:
                 df.to_csv(path, index=False)
 
     def iterate_images(self):
-        files = self.get_files_to_process()[50:]
+        files = self.get_files_to_process()[205:]
         for file in files:
+            print(file)
             img = imageio.imread(file)
             rois, data = self.define_rois(img, training_coordinates=[])
             self.save_patches(file, img, rois)

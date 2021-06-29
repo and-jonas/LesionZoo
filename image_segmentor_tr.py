@@ -203,7 +203,7 @@ class ImageSegmentor:
             all_white = mask.sum(axis=2) == 3
             cols_drop = np.unique(np.where(all_white != 0)[1])
             contour_img = np.delete(prof, cols_drop, axis=1)
-            plt.imshow(contour_img)
+            # plt.imshow(contour_img)
 
             df_sc = fef.extract_color_profiles(contour_img, task=0, scale=True)
             df_raw = fef.extract_color_profiles(contour_img, task=0, scale=False)

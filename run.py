@@ -11,10 +11,10 @@ from roi_selector import TrainingPatchSelector
 
 
 def run():
-    dir_to_process = "D:/LesionZoo/Images"
-    dir_positives = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/Segments/reinforce_iter2"
-    dir_negatives = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Negatives/Segments/reinforce_iter2"
-    dir_control = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Control/Segments/reinforce_iter2"
+    dir_to_process = "Z:/Public/Jonas/001_LesionZoo/EschikonData"
+    dir_positives = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/Segments/reinforce_iter3"
+    dir_negatives = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Negatives/Segments/reinforce_iter3"
+    dir_control = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Control/Segments/reinforce_iter3"
     roi_selector = TrainingPatchSelector(dir_to_process, dir_positives, dir_negatives, dir_control)
     roi_selector.iterate_images()
 

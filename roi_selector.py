@@ -201,7 +201,7 @@ class TrainingPatchSelector:
                 df.to_csv(path, index=False)
 
     def iterate_images(self):
-        files = self.get_files_to_process()[205:]
+        files = self.get_files_to_process()
         for file in files:
             print(file)
             img = imageio.imread(file)

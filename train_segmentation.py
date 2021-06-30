@@ -103,7 +103,7 @@ model = rf_random.fit(X, y)
 rf_random.best_params_
 best_random = rf_random.best_estimator_
 
-from sklearn.model_selection import GridSearchCV# Create the parameter grid based on the results of random search
+from sklearn.model_selection import GridSearchCV  # Create the parameter grid based on the results of random search
 param_grid = {
     'bootstrap': [True],
     'max_depth': [60, 70, 80],
@@ -113,7 +113,7 @@ param_grid = {
     'n_estimators': [200, 300, 400]
 }
 # Create a based model
-rf = RandomForestClassifier()# Instantiate the grid search model
+rf = RandomForestClassifier()  # Instantiate the grid search model
 grid_search = GridSearchCV(estimator=rf, param_grid=param_grid,
                            cv=10, n_jobs=-1, verbose=3)
 

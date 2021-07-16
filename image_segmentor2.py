@@ -32,8 +32,8 @@ from rpy2.robjects.packages import importr
 numpy2ri.activate()
 pandas2ri.activate()
 
-model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.rds"
-model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.dep"
+model_rds_path = "P:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v7.rds"
+model_dep_path = "P:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v7.dep"
 
 # Load R model
 model = robjects.r.readRDS(model_rds_path)
@@ -235,15 +235,10 @@ class ImageSegmentor:
 
         return img_out_all_obj, mask_spl, mask_leaf_cl_dil_filter2
 
-
-
-
-
-
     def iterate_images(self, img_type):
 
         files = self.file_feed()[self.file_index[0]:self.file_index[1]]
-
+        files = ["P:/Public/Jonas/001_LesionZoo/EschikonData/177_1_picture_3_leaf.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn108_15_leaf_1.png"]
         # files = ["Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/c3_sn115_14_leaf_1.png"]
         # files = ["D:/EschikonData/c3_collection/Exports/113_2_picture_8_leaf.png"]
@@ -397,7 +392,7 @@ class ImageSegmentor:
                 clusters, point_ids = fef.split_spatial_clusters(data=df, profile=prof, column_idx=col_idx_kept)
 
                 # get ordering of columns
-                template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")
+                template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v7.csv")
                 cols = template.columns
 
                 # # TEMPORARY

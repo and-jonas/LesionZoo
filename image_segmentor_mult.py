@@ -42,8 +42,8 @@ pandas2ri.activate()
 
 # model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.rds"
 # model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.dep"
-model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v6.rds"  # iter3
-model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v6.dep"  # iter3
+model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v7.rds"  # iter4
+model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v7.dep"  # iter4
 # Load R model
 model = robjects.r.readRDS(model_rds_path)
 
@@ -400,7 +400,7 @@ class ImageSegmentor:
                     plt.close()
 
                     # get ordering of columns
-                    template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v4.csv")
+                    template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v7.csv")
                     cols = template.columns
 
                     # create prediction for each cluster
@@ -477,18 +477,22 @@ class ImageSegmentor:
 
         self.prepare_workspace()
         files = list(self.dir_to_process.glob("*.png"))
+
+        # TEMPORARY
+        files = ["P:/Public/Jonas/001_LesionZoo/EschikonData/177_1_picture_3_leaf.png"]
+
         image_paths = {}
         for i, file in enumerate(files):
             image_name = Path(file).stem
 
             # test if already processed - skip
             final_output_path = self.path_num_output_name / (image_name + '.csv')
-            if final_output_path.exists():
-                continue
+            # if final_output_path.exists():
+            #     continue
             # otherwise add to jobs list
-            else:
-                image_path = self.dir_to_process / (image_name + ".png")
-                image_paths[image_name] = image_path
+            # else:
+            image_path = self.dir_to_process / (image_name + ".png")
+            image_paths[image_name] = image_path
 
         if len(image_paths) > 0:
             # make job and results queue

@@ -123,7 +123,7 @@ class ImageSegmentor:
 
     def iterate_images(self):
 
-        files = self.file_feed()
+        files = self.file_feed()[961:]
 
         for i, file in enumerate(files):
 

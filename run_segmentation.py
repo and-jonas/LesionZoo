@@ -6,7 +6,7 @@
 # ======================================================================================================================
 
 
-from image_segmentor_mult import ImageSegmentor
+from image_segmentor2 import ImageSegmentor
 
 
 def run():

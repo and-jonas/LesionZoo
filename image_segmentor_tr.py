@@ -123,7 +123,7 @@ class ImageSegmentor:
 
     def iterate_images(self):
 
-        files = self.file_feed()[961:]
+        files = self.file_feed()
 
         for i, file in enumerate(files):
 
@@ -140,9 +140,9 @@ class ImageSegmentor:
             img = img[:, :, :3]
             img = np.ascontiguousarray(img, dtype=np.uint8)
             # output paths
-            img_name_out = f'{dirname}/Segmented/Overlay/{basename}'
-            mask_name_out = f'{dirname}/Segmented/Mask/{basename}'
-            mask_all_name_out = f'{dirname}/Segmented/Mask/allObj/{basename}'
+            img_name_out = f'{dirname}/Segmented_temp/Overlay/{basename}'
+            mask_name_out = f'{dirname}/Segmented_temp/Mask/{basename}'
+            mask_all_name_out = f'{dirname}/Segmented_temp/Mask/allObj/{basename}'
 
             # ==========================================================================================================
             # IMAGE SEGMENTATION
@@ -159,7 +159,10 @@ class ImageSegmentor:
             # predict pixel labels
             mask = self.segment_image(img)
             # post process mask
-            img_out, img_out_all_obj, mask_pp, mask_all_obj = self.post_process_segmentation_mask(img, mask)
+            try:
+                img_out, img_out_all_obj, mask_pp, mask_all_obj = self.post_process_segmentation_mask(img, mask)
+            except:
+                continue
 
             # add border to mask
             # mask_pp = utils.add_image_border(mask_pp, intensity=0)
@@ -217,7 +220,7 @@ class ImageSegmentor:
             df.to_csv(prof_name, index=False)
 
             # save checker
-            img_check_name = f'{dirname}/Segmented/Overlay/spl_n/{basename}'
+            img_check_name = f'{dirname}/Segmented_temp/Overlay/spl_n/{basename}'
             Path(os.path.dirname(img_check_name)).mkdir(parents=True, exist_ok=True)
             imageio.imwrite(img_check_name, img_check)
 

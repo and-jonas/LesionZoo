@@ -610,8 +610,8 @@ def cluster_complete_profiles(data):
         avg_SS = [sum(d) / data.shape[0] for d in dist]
 
         # get the "optimal" number of clusters
-        if any(z < 0.25 for z in avg_SS):  # changed from 0.5 (2021-07-15)
-            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 0.25) + 1  # changed from 0.5 (2021-07-15)
+        if any(z < 0.35 for z in avg_SS):  # changed from 0.5 (2021-07-15)
+            best_n_clust = next(x for x, val in enumerate(avg_SS) if val < 0.35) + 1  # changed from 0.5 (2021-07-15)
         else:
             best_n_clust = max_n_clust
 

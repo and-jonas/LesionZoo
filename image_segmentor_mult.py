@@ -42,8 +42,8 @@ pandas2ri.activate()
 
 # model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.rds"
 # model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v4.dep"
-model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v7.rds"  # iter4
-model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v7.dep"  # iter4
+model_rds_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v2.1.rds"  # iter5
+model_dep_path = "Z:/Public/Jonas/001_LesionZoo/Output/Models/spl/pls_v2.1.dep"  # iter5
 # Load R model
 model = robjects.r.readRDS(model_rds_path)
 
@@ -400,7 +400,7 @@ class ImageSegmentor:
                     plt.close()
 
                     # get ordering of columns
-                    template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v7.csv")
+                    template = pd.read_csv("Z:/Public/Jonas/001_LesionZoo/TestingData/template_varnames_v2.1.csv")
                     cols = template.columns
 
                     # create prediction for each cluster
@@ -478,8 +478,8 @@ class ImageSegmentor:
         self.prepare_workspace()
         files = list(self.dir_to_process.glob("*.png"))
 
-        # TEMPORARY
-        files = ["P:/Public/Jonas/001_LesionZoo/EschikonData/177_1_picture_3_leaf.png"]
+        # # TEMPORARY
+        # files = ["P:/Public/Jonas/001_LesionZoo/EschikonData/177_1_picture_3_leaf.png"]
 
         image_paths = {}
         for i, file in enumerate(files):

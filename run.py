@@ -11,7 +11,7 @@ from roi_selector import TrainingPatchSelector
 
 
 def run():
-    dir_to_process = "Z:/Public/Jonas/001_LesionZoo/Leaves_LesionSegments/Leaves_null/reinforce_iter5"
+    dir_to_process = "Z:/Public/Jonas/001_LesionZoo/EschikonData"
     dir_positives = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Positives/Segments/reinforce_iter5"
     dir_negatives = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Negatives/Segments/reinforce_iter5"
     dir_control = "Z:/Public/Jonas/001_LesionZoo/TrainingData_Lesions/Control/Segments/reinforce_iter5"
